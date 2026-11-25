@@ -45,6 +45,7 @@ pub enum ItemId {
     Global(GlobalDeclId),
 }
 
+/// The id of an associated item within a trait.
 #[derive(
     Copy,
     Clone,
@@ -72,6 +73,35 @@ pub enum AssocItemId {
     Type(AssocTypeId),
     Method(TraitMethodId),
     Const(AssocConstId),
+}
+
+/// The id of a translated item or associated item definition.
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumIsA,
+    EnumAsGetters,
+    VariantName,
+    VariantIndexArity,
+    Serialize,
+    Deserialize,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
+#[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Item"))]
+#[serde_state(stateless)]
+pub enum MaybeAssocItemId {
+    Free(ItemId),
+    Assoc(TraitDeclId, AssocItemId),
 }
 
 /// Reference to a type declaration or builtin type.
@@ -207,8 +237,6 @@ pub enum FunId {
     DriveTwo,
 )]
 pub enum BuiltinFunId {
-    /// Used instead of `alloc::boxed::Box::new` when `--treat-box-as-builtin` is set.
-    BoxNew,
     /// Cast `&[T; N]` to `&[T]`.
     ///
     /// This is used instead of unsizing coercions when `--ops-to-function-calls` is set.
@@ -255,7 +283,6 @@ pub enum BuiltinFunId {
 )]
 pub struct BuiltinIndexOp {
     /// Whether this is a slice or array.
-    #[drive(skip)]
     pub is_array: bool,
     /// Whether we're indexing mutably or not. Determines the type ofreference of the input and
     /// output.
@@ -263,7 +290,6 @@ pub struct BuiltinIndexOp {
     /// Whether we're indexing a single element or a subrange. If `true`, the function takes
     /// two indices and the output is a slice; otherwise, the function take one index and the
     /// output is a reference to a single element.
-    #[drive(skip)]
     pub is_range: bool,
 }
 
@@ -308,17 +334,6 @@ pub enum FnPtrKind {
 pub struct FnPtr {
     pub kind: Box<FnPtrKind>,
     pub generics: BoxedArgs,
-}
-
-/// Reference to a function, possibly indirected via a trait.
-/// Used to convert from `DeclRef`.
-#[derive(
-    Debug, Clone, SerializeState, DeserializeState, PartialEq, Eq, Hash, Drive, DriveMut, DriveTwo,
-)]
-pub struct MaybeBuiltinFunDeclRef {
-    pub id: FunId,
-    pub generics: BoxedArgs,
-    pub trait_ref: Option<TraitRef>,
 }
 
 /// Reference to a global declaration.
@@ -540,21 +555,6 @@ impl TryFrom<DeclRef<ItemId>> for FnPtr {
 impl From<FunDeclRef> for FnPtr {
     fn from(fn_ref: FunDeclRef) -> Self {
         FnPtr::new(fn_ref.id.into(), fn_ref.generics)
-    }
-}
-impl TryFrom<DeclRef<ItemId>> for MaybeBuiltinFunDeclRef {
-    type Error = ();
-    fn try_from(item: DeclRef<ItemId>) -> Result<Self, ()> {
-        Ok(item.try_convert_id::<FunId>()?.into())
-    }
-}
-impl From<DeclRef<FunId>> for MaybeBuiltinFunDeclRef {
-    fn from(item: DeclRef<FunId>) -> Self {
-        MaybeBuiltinFunDeclRef {
-            id: item.id,
-            generics: item.generics,
-            trait_ref: item.trait_ref,
-        }
     }
 }
 

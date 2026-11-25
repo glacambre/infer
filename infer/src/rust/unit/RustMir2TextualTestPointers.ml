@@ -393,9 +393,65 @@ let%expect_test "box" =
 
     }
 
+    declare alloc::boxed::{alloc::boxed::Box<T>[TraitClause0, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]}::new(void) : *void
+
     declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
 
     declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" **void) : void
+    |}]
+
+
+(* Charon does not translate the declarations of excluded items: Box::new is then recognised by its
+   name. *)
+let%expect_test "box_new_excluded" =
+  let source = {|
+fn main() {
+    let b = Box::new(1);
+    let _x = *b;
+}
+|} in
+  test ~args:"--hide-allocator --exclude=alloc::boxed::_::new" source ;
+  [%expect
+    {|
+    [WARNING] Unsupported type Opaque: core::ptr::unique::Unique
+    .source_language = "Rust"
+
+    type alloc::alloc::Global = {}
+
+    define dummy::main() : void {
+      local var_0: void, b_1: *int, _x_2: int
+      #node_0:
+          store &var_0 <- null:void
+          n0 = __sil_boxnew(1)
+          store &b_1 <- n0:*int
+          jmp node_2
+          .handlers node_1
+
+      #node_1:
+          throw "UnwindResume"
+
+      #node_2:
+          n1:*int = load &b_1
+          n2:int = load n1
+          store &_x_2 <- n2:int
+          store &var_0 <- null:void
+          n3:*int = load &b_1
+          n4 = __sil_free(n3)
+          jmp node_4
+          .handlers node_3
+
+      #node_3:
+          throw "UnwindResume"
+
+      #node_4:
+          n5:void = load &var_0
+          ret n5
+
+    }
+
+    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
+
+    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1, TraitClause2, TraitClause3]}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" **void) : void
     |}]
 
 
@@ -447,6 +503,8 @@ let%expect_test "box_memoryleak" =
           ret n6
 
     }
+
+    declare alloc::boxed::{alloc::boxed::Box<T>[TraitClause0, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]}::new(void) : *void
 
     define core::mem::forget(t_1: void) : void {
       local var_0: void
@@ -533,6 +591,8 @@ let%expect_test "box_use_after_free" =
           throw "UnwindResume"
 
     }
+
+    declare alloc::boxed::{alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]}::new::<i32>(int) : *int
 
     declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
 
@@ -631,6 +691,8 @@ fn main() {
           ret n4
 
     }
+
+    declare alloc::boxed::{alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]}::new::<i32>(int) : *int
 
     declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
 

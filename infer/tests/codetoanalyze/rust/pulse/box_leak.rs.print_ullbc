@@ -57,6 +57,13 @@ where
     non-dyn-compatible
 }
 
+// Full name: alloc::boxed::{alloc::boxed::Box<T>[TraitClause0, impl_Destruct_for_Global]}::new
+#[diagnostic_item("box_new")]
+pub fn new<T>(_1: T) -> alloc::boxed::Box<T>[TraitClause0, impl_Destruct_for_Global]
+where
+    TraitClause0: (T: Destruct),
+= <opaque>
+
 // Full name: box_leak::main
 fn main()
 {
@@ -69,7 +76,7 @@ fn main()
         storage_live(_0);
         _0 = ();
         storage_live(b);
-        b = @BoxNew<i32>[{built_in impl Destruct for i32}](const 42i32) -> bb2 (unwind: bb1);
+        b = new<i32>[{built_in impl Destruct for i32}](const 42i32) -> bb2 (unwind: bb1);
     }
 
     bb1: {

@@ -65,9 +65,9 @@ pub enum TransItemSourceKind {
     InherentImpl,
     /// We don't translate these as proper items, but we use them to explore the crate.
     Module,
-    /// The `call_*` method of the appropriate `TransImplSource::Closure` impl.
-    ClosureMethod(ClosureKind),
-    /// A cast of a state-less closure as a function pointer.
+    /// The `call_*` method of the generated `Fn*` impl for a closure or fn item.
+    CallableMethod(ClosureKind),
+    /// A cast of a stateless closure to a function pointer.
     ClosureAsFnCast,
     /// The `drop_glue` method of a `Destruct` impl. It contains the drop glue that calls
     /// `Drop::drop` for the type and then drops its fields. This is a method implementation (and
@@ -83,8 +83,8 @@ pub enum TransItemSourceKind {
     /// this takes a `Ptr<dyn Trait>` and forwards to the method. The `DefId` refers to the method
     /// implementation.
     VTableMethod,
-    /// The drop shim function to be used in the vtable as a field, the `DefId` is an `impl`.
-    VTableDropShim,
+    /// The drop shim function to be used in the vtable as a field.
+    VTableDropShim(TransImplSource),
 }
 
 /// The kind of a [`TransItemSourceKind::TraitImpl`].
@@ -94,11 +94,13 @@ pub enum TransImplSource {
     Normal,
     /// The blanket impl we generate for a trait alias. The `DefId` is that of the trait alias.
     TraitAlias,
-    /// An impl of the appropriate `Fn*` trait for a closure. The `DefId` is that of the closure.
-    Closure(ClosureKind),
+    /// An impl of the appropriate `Fn*` trait for a closure or function item.
+    Callable(ClosureKind),
     /// A fictitious `impl Destruct for T` that contains the drop glue code for the given ADT or
     /// closure. The `DefId` is that of the ADT or closure.
     ImplicitDestruct,
+    /// A marker-trait implementation. The `DefId` is that of the trait.
+    Marker,
 }
 
 impl TransItemSource {
@@ -122,7 +124,11 @@ impl TransItemSource {
     /// and polymorphic versions of the item.
     pub fn from_item(item: &hax::ItemRef, kind: TransItemSourceKind, monomorphize: bool) -> Self {
         if monomorphize {
-            Self::monomorphic(item, kind)
+            if kind.is_for_trait() {
+                Self::monomorphic_trait(&item.def_id, kind)
+            } else {
+                Self::monomorphic(item, kind)
+            }
         } else {
             Self::polymorphic(&item.def_id, kind)
         }
@@ -159,12 +165,19 @@ impl TransItemSource {
     /// not attempt to generally compute the parent of an item. Used to compute names.
     pub(crate) fn parent(&self) -> Option<Self> {
         let parent_kind = match self.kind {
-            TransItemSourceKind::ClosureMethod(kind) => {
-                TransItemSourceKind::TraitImpl(TransImplSource::Closure(kind))
+            TransItemSourceKind::CallableMethod(kind) => {
+                TransItemSourceKind::TraitImpl(TransImplSource::Callable(kind))
+            }
+            TransItemSourceKind::DropGlueMethod(TransImplSource::Marker)
+            | TransItemSourceKind::VTableInstance(TransImplSource::Marker)
+            | TransItemSourceKind::VTableInstanceInitializer(TransImplSource::Marker)
+            | TransItemSourceKind::VTableDropShim(TransImplSource::Marker) => {
+                TransItemSourceKind::TraitDecl
             }
             TransItemSourceKind::DropGlueMethod(impl_kind)
             | TransItemSourceKind::VTableInstance(impl_kind)
-            | TransItemSourceKind::VTableInstanceInitializer(impl_kind) => {
+            | TransItemSourceKind::VTableInstanceInitializer(impl_kind)
+            | TransItemSourceKind::VTableDropShim(impl_kind) => {
                 TransItemSourceKind::TraitImpl(impl_kind)
             }
             _ => return None,
@@ -185,6 +198,15 @@ impl TransItemSource {
                 | Module
                 | Fun
                 | Type
+        )
+    }
+}
+
+impl TransItemSourceKind {
+    pub fn is_for_trait(&self) -> bool {
+        matches!(
+            self,
+            TransItemSourceKind::TraitDecl | TransItemSourceKind::VTable
         )
     }
 }
@@ -317,12 +339,12 @@ impl<'tcx> TranslateCtx<'tcx> {
                         ItemId::Global(self.translated.global_decls.reserve_slot())
                     }
                     Fun
-                    | ClosureMethod(..)
+                    | CallableMethod(..)
                     | ClosureAsFnCast
                     | DropGlueMethod(..)
                     | VTableInstanceInitializer(..)
                     | VTableMethod
-                    | VTableDropShim => ItemId::Fun(self.translated.fun_decls.reserve_slot()),
+                    | VTableDropShim(..) => ItemId::Fun(self.translated.fun_decls.reserve_slot()),
                     InherentImpl | Module => return None,
                 };
                 // Add the id to the queue of declarations to translate
@@ -592,19 +614,9 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         //   2. Otherwise, if the current `item_trans_ctx` is under a `trait decl`
         //      or a `vtable`, we construct a `poly` item.
         //   3. In all other cases, we construct a `mono` item.
-        let item_src = if self.monomorphize() && matches!(kind, TransItemSourceKind::TraitDecl) {
-            TransItemSource::monomorphic_trait(&item.def_id, kind)
-        } else {
-            TransItemSource::from_item(
-                &item,
-                kind,
-                self.monomorphize()
-                    && !matches!(
-                        self.item_src.kind,
-                        TransItemSourceKind::TraitDecl | TransItemSourceKind::VTable
-                    ),
-            )
-        };
+        let mono =
+            self.monomorphize() && (kind.is_for_trait() || !self.item_src.kind.is_for_trait());
+        let item_src = TransItemSource::from_item(&item, kind, mono);
         if enqueue {
             self.register_and_enqueue(span, item_src)
         } else {
@@ -682,8 +694,13 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                     generics
                         .regions
                         .extend((0..upvar_regions).map(|_| self.translate_erased_region()));
-                    if let TransItemSourceKind::TraitImpl(TransImplSource::Closure(..))
-                    | TransItemSourceKind::ClosureMethod(..)
+                    if let TransItemSourceKind::TraitImpl(TransImplSource::Callable(..))
+                    | TransItemSourceKind::VTableInstance(TransImplSource::Callable(..))
+                    | TransItemSourceKind::VTableInstanceInitializer(
+                        TransImplSource::Callable(..),
+                    )
+                    | TransItemSourceKind::VTableDropShim(TransImplSource::Callable(..))
+                    | TransItemSourceKind::CallableMethod(..)
                     | TransItemSourceKind::ClosureAsFnCast = kind
                     {
                         generics.regions.extend(
@@ -693,33 +710,31 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                                 .map(|_| self.translate_erased_region()),
                         );
                     }
-                    if let TransItemSourceKind::ClosureMethod(
-                        ClosureKind::FnMut | ClosureKind::Fn,
-                    ) = kind
-                    {
-                        generics.regions.push(self.translate_erased_region());
-                    }
-                    // If we're in the process of translating this same closure item (possibly with
-                    // a different `TransItemSourceKind`), we can reuse the generics they have in
-                    // common.
-                    if self.item_src.def_id() == &args.item.def_id {
-                        let depth = self.binding_levels.depth();
-                        for (a, b) in generics.regions.iter_mut().zip(
-                            self.outermost_binder()
-                                .params
-                                .identity_args_at_depth(depth)
-                                .regions,
-                        ) {
-                            *a = b;
-                        }
-                    }
                 }
                 _ => {}
+            }
+            if let TransItemSourceKind::CallableMethod(ClosureKind::FnMut | ClosureKind::Fn) = kind
+            {
+                generics.regions.push(self.translate_erased_region());
+            }
+            // If we're in the process of translating this same item (possibly with a
+            // different `TransItemSourceKind`), we can reuse the generics they have in
+            // common.
+            if self.item_src.def_id() == &hax_item.def_id {
+                let depth = self.binding_levels.depth();
+                for (a, b) in generics.regions.iter_mut().zip(
+                    self.outermost_binder()
+                        .params
+                        .identity_args_at_depth(depth)
+                        .regions,
+                ) {
+                    *a = b;
+                }
             }
         }
         if matches!(
             kind,
-            TransItemSourceKind::DropGlueMethod(..) | TransItemSourceKind::VTableDropShim
+            TransItemSourceKind::DropGlueMethod(..) | TransItemSourceKind::VTableDropShim(..)
         ) {
             generics = generics.concat(&self.drop_glue_generic_args());
         }
@@ -770,27 +785,6 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         }
     }
 
-    pub(crate) fn translate_fun_item_maybe_enqueue(
-        &mut self,
-        span: Span,
-        item: &hax::ItemRef,
-        kind: TransItemSourceKind,
-        enqueue: bool,
-    ) -> Result<MaybeBuiltinFunDeclRef, Error> {
-        match self.recognize_builtin_fun(item)? {
-            Some(id) => {
-                let generics =
-                    self.translate_generic_args(span, &item.generic_args, &item.trait_proofs)?;
-                Ok(MaybeBuiltinFunDeclRef {
-                    id: FunId::Builtin(id),
-                    generics: Box::new(generics),
-                    trait_ref: None,
-                })
-            }
-            None => self.translate_item_maybe_enqueue(span, item, kind, enqueue),
-        }
-    }
-
     /// Translate a reference to a trait method declaration without registering the declaration as
     /// a `FunDecl`. `TraitDecl.methods` contains the declaration signature and metadata; only
     /// default implementations give rise to a real function item.
@@ -830,8 +824,8 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         .map(Some)
     }
 
-    /// Auxiliary function to translate function calls and references to functions.
-    /// Translate a function id applied with some substitutions.
+    /// Translate a function reference, assuming that the late-bound regions are in scope. Prefer
+    /// the `translate_bound_fn_ptr*` methods whenever sensible.
     #[tracing::instrument(skip(self, span))]
     pub(crate) fn translate_unbound_fn_ptr_maybe_enqueue(
         &mut self,
@@ -840,10 +834,12 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         kind: TransItemSourceKind,
         enqueue: bool,
     ) -> Result<FnPtr, Error> {
-        let fun_item = self.translate_fun_item_maybe_enqueue(span, item, kind, enqueue)?;
+        let fun_item: DeclRef<ItemId> =
+            self.translate_item_maybe_enqueue(span, item, kind, enqueue)?;
+        let fun_item: DeclRef<FunDeclId> = fun_item.try_convert_id().unwrap();
         let fun_id = match fun_item.trait_ref {
             // Direct function call
-            None => FnPtrKind::Fun(fun_item.id),
+            None => FnPtrKind::Fun(FunId::Regular(fun_item.id)),
             // Trait method
             Some(trait_ref) => {
                 let trait_decl_id = trait_ref.trait_id();

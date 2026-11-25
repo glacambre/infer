@@ -48,22 +48,20 @@ pub enum Attribute {
     /// The structure is treated as a transparent wrapper around its sole field.
     /// Written `#[charon::transparent]`.
     Transparent,
-    /// An item annotated with `#[charon::precondition]`. This makes it a precondition for its
-    /// parent item.
-    IsPrecondition(ItemId),
-    /// An item annotated with `#[charon::postcondition]`. This makes it a postcondition for its
-    /// parent item.
-    IsPostcondition(ItemId),
-    /// An item that has a precondition that applies to it. The referenced item is a function the
-    /// specifies the condition.
-    HasPrecondition(FunDeclId),
-    /// An item that has a postcondition that applies to it. The referenced item is a function the
-    /// specifies the condition.
-    HasPostcondition(FunDeclId),
+    /// An item annotated with `#[charon::contract(kind = "...", parent)]` or
+    /// `#[charon::contract(kind = "...", for = "...")]`. This makes it a contract for the target
+    /// item.
+    IsContract {
+        kind: String,
+        target: MaybeAssocItemId,
+    },
+    /// An item that has a contract that applies to it. The referenced item is the function that
+    /// specifies the contract.
+    HasContract { kind: String, contract: FunDeclId },
     /// A doc-comment such as `/// ...`.
     DocComment(String),
     /// A built-in attribute.
-    Builtin(#[drive(skip)] from_rustc::AttributeKind),
+    Builtin(from_rustc::AttributeKind),
     /// None of the above.
     Unknown(RawAttribute),
 }
@@ -78,9 +76,7 @@ pub struct RawAttribute {
 }
 
 /// Information about the attributes and visibility of an item, field or variant..
-#[derive(
-    Debug, PartialEq, Eq, Default, Clone, Serialize, Deserialize, Drive, DriveMut, DriveTwo,
-)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, Drive, DriveMut, DriveTwo)]
 pub struct AttrInfo {
     /// Attributes (`#[...]`).
     pub attributes: Vec<Attribute>,

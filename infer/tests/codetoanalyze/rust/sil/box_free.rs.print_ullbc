@@ -31,6 +31,13 @@ where
     TypeOutlives1: A: '_0,
 = <opaque>
 
+// Full name: alloc::boxed::{alloc::boxed::Box<T>[TraitClause0, impl_Destruct_for_Global]}::new
+#[diagnostic_item("box_new")]
+pub fn new<T>(_1: T) -> alloc::boxed::Box<T>[TraitClause0, impl_Destruct_for_Global]
+where
+    TraitClause0: (T: Destruct),
+= <opaque>
+
 // Full name: box_free::main
 fn main()
 {
@@ -46,7 +53,7 @@ fn main()
         _0 = ();
         storage_live(ptr);
         storage_live(x);
-        x = @BoxNew<i32>[{built_in impl Destruct for i32}](const 50i32) -> bb2 (unwind: bb1);
+        x = new<i32>[{built_in impl Destruct for i32}](const 50i32) -> bb2 (unwind: bb1);
     }
 
     bb1: {

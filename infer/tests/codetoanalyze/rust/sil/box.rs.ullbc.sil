@@ -36,6 +36,8 @@ define box::main() : void {
       
 }
 
+declare alloc::boxed::{alloc::boxed::Box<T>[TraitClause0, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]}::new(void) : *void
+
 declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
 
 declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" **void) : void

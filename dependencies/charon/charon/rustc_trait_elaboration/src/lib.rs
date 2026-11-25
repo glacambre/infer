@@ -32,6 +32,7 @@ pub use utils::*;
 use rustc_data_structures::intern::Interned;
 use rustc_hir::def_id::DefId;
 use rustc_middle::ty;
+use rustc_type_ir::lang_items::SolverTraitLangItem;
 use std::hash::Hash;
 use std::ops::Deref;
 
@@ -58,11 +59,12 @@ pub enum BuiltinTraitData<'tcx> {
     /// the information about `drop_in_place` to that trait. This data tells us what kind of
     /// `drop_in_place` the target type has.
     Destruct(DestructData<'tcx>),
+    /// A trait alias.
+    Alias,
     /// An auto-trait.
     Auto,
     /// Some other builtin trait.
-    // FIXME: carry the SolverTraitLangItem here directly
-    Other,
+    Other(SolverTraitLangItem),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -76,6 +78,28 @@ pub enum ImpliedPredicate<'tcx, Id: ItemId = DefId> {
         /// The index of this predicate among the trait predicates returned by `ItemPredicates::Implied`.
         index: usize,
     },
+}
+
+/// A predicate bound by a dyn type, together with the extra trait proof needed to translate an
+/// associated type constraint.
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct DynPredicate<'tcx, Id: ItemId = DefId> {
+    /// The predicate with the dyn binder's fresh type parameter as `Self`.
+    pub predicate: ItemPredicate<'tcx, Id>,
+    /// The proof for the trait whose associated type is constrained, if this is a projection.
+    pub projection_trait_proof: Option<TraitProof<'tcx, Id>>,
+}
+
+/// A representation of `exists<T: Trait1 + Trait2>(value)`: we create a fresh type parameter and
+/// the appropriate trait clauses. The contained value may refer to both.
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct DynBinder<'tcx, T, Id: ItemId = DefId> {
+    /// The fresh type parameter used as `Self` in the predicates below.
+    pub existential_ty: ty::ParamTy,
+    /// The clauses that define the trait object.
+    pub predicates: Vec<DynPredicate<'tcx, Id>>,
+    /// The value inside the binder.
+    pub val: T,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -92,7 +116,9 @@ pub enum TraitProofKind<'tcx, Id: ItemId = DefId> {
     /// instance of type `Trait`.
     /// `dyn Trait` implements `Trait` using a built-in implementation; this refers to that
     /// built-in implementation.
-    Dyn,
+    /// The proof describes how to prove the current predicate in the context of the `dyn Trait`
+    /// self type, e.g. for `<dyn Trait as Supertrait>`.
+    Dyn(DynBinder<'tcx, TraitProof<'tcx, Id>, Id>),
     /// A built-in trait whose implementation is computed by the compiler, such as `FnMut`. This
     /// morally points to an invisible `impl` block; as such it contains the information we may
     /// need from one.

@@ -20,9 +20,7 @@ use crate::utils::serialize_map_to_array::SeqHashMapToArray;
 ///
 /// A type can only be an ADT (structure or enumeration), as type aliases are
 /// inlined in MIR.
-#[derive(
-    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
-)]
+#[derive(Debug, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo)]
 #[serde_state(state_implements = HashConsSerializerState)]
 pub struct TypeDecl {
     pub def_id: TypeDeclId,
@@ -46,8 +44,6 @@ generate_index_type!(FieldId, "Field");
 
 #[derive(
     Debug,
-    PartialEq,
-    Eq,
     Clone,
     EnumIsA,
     EnumAsGetters,
@@ -71,20 +67,16 @@ pub enum TypeDeclKind {
     /// Used if an error happened during the extraction, and we don't panic
     /// on error.
     #[cfg_attr(feature = "charon_on_charon", charon::rename("TDeclError"))]
-    #[drive(skip)]
     Error(String),
 }
 
-#[derive(
-    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
-)]
+#[derive(Debug, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo)]
 #[serde_state(stateless)]
 pub struct Variant {
     pub id: VariantId,
     pub span: Span,
     pub attr_info: AttrInfo,
     #[cfg_attr(feature = "charon_on_charon", charon::rename("variant_name"))]
-    #[drive(skip)]
     pub name: String,
     #[serde_state(stateful)]
     pub fields: IndexVec<FieldId, Field>,
@@ -94,15 +86,12 @@ pub struct Variant {
     pub discriminant: Literal,
 }
 
-#[derive(
-    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
-)]
+#[derive(Debug, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo)]
 #[serde_state(stateless)]
 pub struct Field {
     pub span: Span,
     pub attr_info: AttrInfo,
     #[cfg_attr(feature = "charon_on_charon", charon::rename("field_name"))]
-    #[drive(skip)]
     pub name: String,
     /// Whether this field is positional, as in a tuple struct, tuple variant, or closure. If so,
     /// its name is based on its position, such as `_0`; otherwise, it is a user-provided name.
@@ -149,9 +138,7 @@ pub enum PtrMetadata {
 }
 
 /// Where a given type came from.
-#[derive(
-    Debug, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo, PartialEq, Eq,
-)]
+#[derive(Debug, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo)]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_suffix("Type"))]
 pub enum TypeSource {
     /// A normal type declaration.

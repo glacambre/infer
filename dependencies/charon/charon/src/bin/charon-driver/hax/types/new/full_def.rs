@@ -316,8 +316,14 @@ pub enum FullDefKind<'tcx> {
     Trait {
         param_env: ParamEnv,
         implied_predicates: GenericPredicates,
+        /// Proofs of the implied predicates. Most often uses the `Self` clause, except for builtin
+        /// traits like `Sized`.
+        implied_trait_proofs: Vec<TraitProof>,
         /// The special `Self: Trait` clause.
         self_predicate: TraitPredicate,
+        /// The proof for the special `Self: Trait` clause. Almost always a `TraitProofKind::Self`,
+        /// except for builtin traits like `Sized`.
+        self_proof: TraitProof,
         /// Associated items, in definition order.
         items: Vec<AssocItem>,
         /// `dyn Trait<Args.., Ty = <Self as Trait>::Ty..>` for this trait. This is `Some` iff this
@@ -364,6 +370,12 @@ pub enum FullDefKind<'tcx> {
         inline: InlineAttr,
         is_const: bool,
         sig: PolyFnSig,
+        /// Info required to construct a virtual `FnOnce` impl for this function, if compatible.
+        fn_once_impl: Option<Box<VirtualTraitImpl>>,
+        /// Info required to construct a virtual `FnMut` impl for this function, if compatible.
+        fn_mut_impl: Option<Box<VirtualTraitImpl>>,
+        /// Info required to construct a virtual `Fn` impl for this function, if compatible.
+        fn_impl: Option<Box<VirtualTraitImpl>>,
     },
     /// Associated function: `impl MyStruct { fn associated() {} }` or `trait Foo { fn associated()
     /// {} }`
@@ -377,6 +389,12 @@ pub enum FullDefKind<'tcx> {
         /// signature with `Self` replaced by `dyn Trait` and associated types normalized.
         vtable_sig: Option<PolyFnSig>,
         sig: PolyFnSig,
+        /// Info required to construct a virtual `FnOnce` impl for this function, if compatible.
+        fn_once_impl: Option<Box<VirtualTraitImpl>>,
+        /// Info required to construct a virtual `FnMut` impl for this function, if compatible.
+        fn_mut_impl: Option<Box<VirtualTraitImpl>>,
+        /// Info required to construct a virtual `Fn` impl for this function, if compatible.
+        fn_impl: Option<Box<VirtualTraitImpl>>,
     },
     /// A closure, coroutine, or coroutine-closure.
     Closure {
@@ -607,6 +625,34 @@ where
     let tcx = s.base().tcx;
     let type_of_self = || inst_binder(tcx, s.typing_env(), args, hax_def_id.type_of(s));
     let args_or_default = || args.unwrap_or_else(|| hax_def_id.identity_args(s));
+    let fn_def_trait_impls = |def_id: RDefId, sig: ty::EarlyBinder<'tcx, ty::PolyFnSig<'tcx>>| {
+        if sig.skip_binder().is_fn_trait_compatible()
+            && tcx.codegen_fn_attrs(def_id).target_features.is_empty()
+        {
+            let fn_args = args_or_default();
+            let fn_sig = inst_binder(tcx, s.typing_env(), args, sig);
+
+            let self_ty = ty::Ty::new_fn_def(tcx, def_id, fn_sig.rebind(fn_args));
+            let fn_sig = tcx.liberate_late_bound_regions(def_id, fn_sig);
+            let input_ty = ty::Ty::new_tup(tcx, fn_sig.inputs());
+            let trait_args = [self_ty, input_ty];
+
+            let fn_once_trait = tcx.lang_items().fn_once_trait().unwrap();
+            let fn_mut_trait = tcx.lang_items().fn_mut_trait().unwrap();
+            let fn_trait = tcx.lang_items().fn_trait().unwrap();
+
+            let fn_once_tref = ty::TraitRef::new(tcx, fn_once_trait, trait_args);
+            let fn_mut_tref = ty::TraitRef::new(tcx, fn_mut_trait, trait_args);
+            let fn_tref = ty::TraitRef::new(tcx, fn_trait, trait_args);
+            Some((
+                virtual_impl_for(s, fn_once_tref),
+                virtual_impl_for(s, fn_mut_tref),
+                virtual_impl_for(s, fn_tref),
+            ))
+        } else {
+            None
+        }
+    };
     match get_def_kind(tcx, def_id) {
         RDefKind::Struct { .. } | RDefKind::Union { .. } | RDefKind::Enum { .. } => {
             let def = tcx.adt_def(def_id);
@@ -664,7 +710,9 @@ where
         RDefKind::Trait { .. } => FullDefKind::Trait {
             param_env: get_param_env(s, args),
             implied_predicates: get_implied_predicates(s, args),
+            implied_trait_proofs: solve_item_implied_traits(s, def_id, args_or_default()),
             self_predicate: get_self_predicate(s, args),
+            self_proof: solve_trait(s, self_trait_ref(s, args)),
             dyn_self: get_trait_decl_dyn_self_ty(s, args).sinto(s),
             items: tcx
                 .associated_items(def_id)
@@ -804,14 +852,22 @@ where
                 }
             }
         }
-        RDefKind::Fn { .. } => FullDefKind::Fn {
-            param_env: get_param_env(s, args),
-            inline: tcx.codegen_fn_attrs(def_id).inline.sinto(s),
-            is_const: matches!(tcx.constness(def_id), rustc_hir::Constness::Const { .. }),
-            sig: inst_binder(tcx, s.typing_env(), args, tcx.fn_sig(def_id)).sinto(s),
-        },
+        RDefKind::Fn { .. } => {
+            let sig = tcx.fn_sig(def_id);
+            let fn_trait_impls = fn_def_trait_impls(def_id, sig);
+            FullDefKind::Fn {
+                param_env: get_param_env(s, args),
+                inline: tcx.codegen_fn_attrs(def_id).inline.sinto(s),
+                is_const: matches!(tcx.constness(def_id), rustc_hir::Constness::Const { .. }),
+                sig: inst_binder(tcx, s.typing_env(), args, sig).sinto(s),
+                fn_once_impl: fn_trait_impls.as_ref().map(|(vimpl, _, _)| vimpl.clone()),
+                fn_mut_impl: fn_trait_impls.as_ref().map(|(_, vimpl, _)| vimpl.clone()),
+                fn_impl: fn_trait_impls.map(|(_, _, vimpl)| vimpl),
+            }
+        }
         RDefKind::AssocFn { .. } => {
             let item = tcx.associated_item(def_id);
+            let fn_trait_impls = fn_def_trait_impls(def_id, tcx.fn_sig(def_id));
             FullDefKind::AssocFn {
                 param_env: get_param_env(s, args),
                 associated_item: AssocItem::sfrom_instantiated(s, &item, args),
@@ -819,6 +875,9 @@ where
                 is_const: matches!(tcx.constness(def_id), rustc_hir::Constness::Const { .. }),
                 vtable_sig: gen_vtable_sig(s, args),
                 sig: get_method_sig(tcx, s.typing_env(), def_id, args).sinto(s),
+                fn_once_impl: fn_trait_impls.as_ref().map(|(vimpl, _, _)| vimpl.clone()),
+                fn_mut_impl: fn_trait_impls.as_ref().map(|(_, vimpl, _)| vimpl.clone()),
+                fn_impl: fn_trait_impls.map(|(_, _, vimpl)| vimpl),
             }
         }
         RDefKind::Closure { .. } => {
@@ -1241,14 +1300,19 @@ fn get_self_predicate<'tcx, S: UnderOwnerState<'tcx>>(
 ) -> TraitPredicate {
     use ty::Upcast;
     let tcx = s.base().tcx;
+    let pred: ty::TraitPredicate = self_trait_ref(s, args).no_bound_vars().unwrap().upcast(tcx);
+    pred.sinto(s)
+}
+
+fn self_trait_ref<'tcx, S: UnderOwnerState<'tcx>>(
+    s: &S,
+    args: Option<ty::GenericArgsRef<'tcx>>,
+) -> ty::PolyTraitRef<'tcx> {
+    let tcx = s.base().tcx;
     let def_id = s.owner().as_real_def_id().unwrap();
     let typing_env = s.typing_env();
-    let pred: ty::TraitPredicate = self_predicate(tcx, def_id)
-        .no_bound_vars()
-        .unwrap()
-        .upcast(tcx);
-    let pred = substitute(tcx, typing_env, args, pred);
-    pred.sinto(s)
+    let pred = self_predicate(tcx, def_id);
+    substitute(tcx, typing_env, args, pred)
 }
 
 /// Generates a `dyn Trait<Args.., Ty = <Self as Trait>::Ty..>` type for this trait.

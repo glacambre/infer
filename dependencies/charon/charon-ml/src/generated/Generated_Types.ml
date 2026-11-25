@@ -14,9 +14,6 @@ module TypeVarId = IdGen ()
 module VariantId = IdGen ()
 module FieldId = IdGen ()
 module ConstGenericVarId = IdGen ()
-module TraitMethodId = IdGen ()
-module AssocTypeId = IdGen ()
-module AssocConstId = IdGen ()
 module TraitClauseId = IdGen ()
 module TraitTypeConstraintId = IdGen ()
 module UnsolvedTraitId = IdGen ()
@@ -179,9 +176,6 @@ type abi =
   | AbiOther of string
       (** Rust's spelling for the ABI, e.g. "C-unwind" or "system". *)
 
-and assoc_const_id = (AssocConstId.id[@visitors.opaque])
-and assoc_type_id = (AssocTypeId.id[@visitors.opaque])
-
 (** A value of type [T] bound by generic parameters. Used in any context where
     we're adding generic parameters that aren't on the top-level item, e.g.
     [for<'a>] clauses (uses [RegionBinder] for now), trait methods, GATs (TODO).
@@ -208,9 +202,6 @@ and binder_kind =
 (** A built-in function, representing a specific built-in function that's part
     of the LLBC semantics. *)
 and builtin_fun_id =
-  | BoxNew
-      (** Used instead of [alloc::boxed::Box::new] when [--treat-box-as-builtin]
-          is set. *)
   | ArrayToSliceShared
       (** Cast [&[T; N]] to [&[T]].
 
@@ -568,8 +559,6 @@ and trait_decl_ref = { id : trait_decl_id; generics : generic_args }
 (** A reference to a tait impl, using the provided arguments. *)
 and trait_impl_ref = { id : trait_impl_id; generics : generic_args }
 
-and trait_method_id = (TraitMethodId.id[@visitors.opaque])
-
 (** A trait predicate in a signature, of the form [Type: Trait<Args>]. This
     functions like a variable binder, to which variables of the form
     [TraitRefKind::Clause] can refer to. *)
@@ -660,7 +649,10 @@ and trait_ref_kind =
           including trait method declarations. Not present in trait
           implementations as we can use [TraitImpl] intead. *)
   | BuiltinOrAuto of
-      builtin_impl_data * trait_ref list * trait_assoc_ty_impl assoc_type_id_map
+      builtin_impl_data
+      * trait_ref list
+      * trait_assoc_ty_impl assoc_type_id_map
+      * global_decl_ref option
       (** A trait implementation that is computed by the compiler, such as for
           built-in trait [Sized]. This morally points to an invisible [impl]
           block; as such it contains the information we may need from one.
@@ -672,12 +664,14 @@ and trait_ref_kind =
           [[BuiltinImplData::RemovedAdtClause]].
 
           Fields:
-          - [builtin_data]
+          - [builtin_data]: Metadata that identifies this impl.
           - [parent_trait_refs]: Exactly like the same field on [TraitImpl]: the
             [TraitRef]s required to satisfy the implied predicates on the trait
             declaration. E.g. since [FnMut: FnOnce], a built-in [T: FnMut] impl
             would have a [TraitRef] for [T: FnOnce].
-          - [types]: The values of the associated types for this trait. *)
+          - [types]: The values of the associated types for this trait.
+          - [vtable]: The vtable value for this builtin implementation, if we
+            generated one. *)
   | Dyn  (** The automatically-generated implementation for [dyn Trait]. *)
   | UnknownTrait of string  (** For error reporting. *)
 

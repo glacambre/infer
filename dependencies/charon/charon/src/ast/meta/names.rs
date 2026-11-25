@@ -10,6 +10,7 @@ generate_index_type!(Disambiguator);
 /// We treat this one specially in the `inline_local_panic_functions` pass. See there for details.
 pub static EXPLICIT_PANIC_NAME: &[&str] = &["core", "panicking", "panic_explicit"];
 pub static BOX_ASSUME_INIT_INTO_VEC_UNSAFE: &str = "box_assume_init_into_vec_unsafe";
+pub static BOX_NEW: &str = "alloc::boxed::Box::new";
 pub static BOX_WRITE: &str = "alloc::boxed::Box::write";
 pub static BOX_WRITE_PATTERN: &str = "alloc::boxed::_::write"; // `_` matches an impl block
 
@@ -31,7 +32,7 @@ pub static BOX_WRITE_PATTERN: &str = "alloc::boxed::_::write"; // `_` matches an
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Pe"))]
 pub enum PathElem {
     #[serde_state(stateless)]
-    Ident(#[drive(skip)] String, Disambiguator),
+    Ident(String, Disambiguator),
     Impl(ImplElem),
     /// This item was obtained by instantiating its parent with the given args. The binder binds
     /// the parameters of the new items. If the binder binds nothing then this is a
@@ -39,7 +40,7 @@ pub enum PathElem {
     Instantiated(Box<Binder<GenericArgs>>),
     /// This item is only available on the given target. Only appears in multi-target mode.
     #[serde_state(stateless)]
-    Target(#[drive(skip)] TargetTriple),
+    Target(TargetTriple),
 }
 
 /// There are two kinds of `impl` blocks:

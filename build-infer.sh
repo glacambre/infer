@@ -184,11 +184,12 @@ if [ "$BUILD_CLANG" == "no" ] && [ "$BUILD_ERLANG" == "no" ] && \
   build_all
 fi
 
-CHARON_VERSION="0.1.238"
-CHARON_VERSION_COMMIT="ac4c583f8ce1288d45294a37edb1e9862c21dcbc"
+CHARON_VERSION="0.1.242"
+CHARON_VERSION_COMMIT="1c5f058e1913d4d26d84adbe888d68f1df6020db"
 # Check for charon on path when rust is enabled
 if [ "$BUILD_RUST" == "yes" ]; then
-  if [[ $(charon version) != "$CHARON_VERSION" ]]; then
+  # Charon also prints the source commit after the version number.
+  if [[ $(charon version | cut -d ' ' -f 1) != "$CHARON_VERSION" ]]; then
     echo "Warning: charon command not found or charon is the incorrect version " \
          "(is it on your PATH ?)"
     echo "The rust analyzer requires version $CHARON_VERSION of the charon library"

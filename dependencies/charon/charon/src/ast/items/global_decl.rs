@@ -4,9 +4,7 @@ use serde_state::DeserializeState;
 use serde_state::SerializeState;
 
 /// A global variable definition (constant or static).
-#[derive(
-    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
-)]
+#[derive(Debug, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo)]
 pub struct GlobalDecl {
     pub def_id: GlobalDeclId,
     /// The meta data associated with the declaration.
@@ -17,7 +15,6 @@ pub struct GlobalDecl {
     /// vtable instances.
     pub src: GlobalSource,
     /// The kind of global (static or const).
-    #[drive(skip)]
     pub global_kind: GlobalKind,
     /// The value of this constant/static. By default this is a [`ConstantExprKind::Call`] to the
     /// initializer function that computes the value (the function uses the same generic parameters
@@ -43,9 +40,7 @@ pub enum GlobalKind {
 }
 
 /// Where a given global came from.
-#[derive(
-    Debug, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo, PartialEq, Eq,
-)]
+#[derive(Debug, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo)]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_suffix("Global"))]
 pub enum GlobalSource {
     /// A normal global.
@@ -67,7 +62,6 @@ pub enum GlobalSource {
         item_id: AssocConstId,
         /// True if the trait decl had a default value for this const and this item is a copy of
         /// the default item.
-        #[drive(skip)]
         reuses_default: bool,
     },
     /// Defines the vtable for a trait impl.

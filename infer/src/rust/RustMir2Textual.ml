@@ -104,19 +104,45 @@ let mk_typename_from_type_decl crate (type_decl : Charon.Generated_Types.type_de
 
 
 (* Model for box drops when using --desugar-drops *)
-let is_box_primitive_drop_glue crate fun_decl_id =
-  let decl = fun_map_find_id crate fun_decl_id in
-  match (decl.item_meta.name, decl.signature.inputs) with
-  | ( PeIdent ("alloc", _)
-      :: PeIdent ("boxed", _)
-      :: PeIdent ("Box", _)
-      :: _
-      :: PeIdent ("drop_glue", _)
-      :: _
-    , TRef (_, TAdt {id= TBuiltin TBox; generics= {types= TLiteral _ :: _}}, RMut) :: _ ) ->
-      true
-  | _, _ ->
+let is_box_primitive_drop_glue (crate : Charon.UllbcAst.crate) fun_decl_id =
+  match Charon.Types.FunDeclId.Map.find_opt fun_decl_id crate.fun_decls with
+  | None ->
       false
+  | Some decl -> (
+    match (decl.item_meta.name, decl.signature.inputs) with
+    | ( PeIdent ("alloc", _)
+        :: PeIdent ("boxed", _)
+        :: PeIdent ("Box", _)
+        :: _
+        :: PeIdent ("drop_glue", _)
+        :: _
+      , TRef (_, TAdt {id= TBuiltin TBox; generics= {types= TLiteral _ :: _}}, RMut) :: _ ) ->
+        true
+    | _, _ ->
+        false )
+
+
+(* Box::new is identified by its diagnostic item. Charon does not translate the declarations of
+   excluded items (e.g. with --exclude=alloc) but still records their names, so fall back to the
+   name of Box::new when its declaration is missing. *)
+let is_box_new (crate : Charon.UllbcAst.crate) fun_decl_id =
+  match Charon.Types.FunDeclId.Map.find_opt fun_decl_id crate.fun_decls with
+  | Some decl ->
+      Option.exists decl.item_meta.diagnostic_item ~f:(String.equal "box_new")
+  | None -> (
+    match
+      List.Assoc.find crate.item_names ~equal:Charon.Generated_Meta.equal_item_id
+        (Charon.Generated_Meta.IdFun fun_decl_id)
+    with
+    | Some
+        ( PeIdent ("alloc", _)
+        :: PeIdent ("boxed", _)
+        :: PeImpl (ImplElemTy _)
+        :: PeIdent ("new", _)
+        :: ([] | [PeInstantiated _]) ) ->
+        true
+    | _ ->
+        false )
 
 
 let fun_name_from_fun_operand (crate : Charon.UllbcAst.crate)
@@ -125,11 +151,11 @@ let fun_name_from_fun_operand (crate : Charon.UllbcAst.crate)
   | FnOpRegular {kind= FunId (FRegular fun_decl_id)}
     when is_box_primitive_drop_glue crate fun_decl_id ->
       Textual.ProcDecl.boxdrop_name
+  | FnOpRegular {kind= FunId (FRegular fun_decl_id)} when is_box_new crate fun_decl_id ->
+      Textual.ProcDecl.boxnew_name
   | FnOpRegular {kind= FunId (FRegular fun_decl_id)} ->
       let decl = fun_map_find_id crate fun_decl_id in
       mk_qualified_proc_name crate decl.item_meta
-  | FnOpRegular {kind= FunId (FBuiltin BoxNew)} ->
-      Textual.ProcDecl.boxnew_name
   | _ ->
       L.die UserError "[ERROR] Unsupported fun operand: @. > %a @."
         Charon.Generated_GAst.pp_fn_operand operand

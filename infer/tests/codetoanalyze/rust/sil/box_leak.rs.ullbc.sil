@@ -41,6 +41,8 @@ define box_leak::main() : void {
       
 }
 
+declare alloc::boxed::{alloc::boxed::Box<T>[TraitClause0, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]}::new(void) : *void
+
 define core::mem::forget(t_1: void) : void {
   local var_0: void
   #node_0:

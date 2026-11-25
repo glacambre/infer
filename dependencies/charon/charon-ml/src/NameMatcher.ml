@@ -668,7 +668,7 @@ and match_trait_decl_ref (ctx : ctx) (c : match_config) (m : maps)
 
 and match_trait_decl_ref_item (ctx : ctx) (c : match_config) (m : maps)
     (pid : pattern) (tr : T.trait_decl_ref T.region_binder)
-    (item_id : GAstUtils.assoc_item_id) (generics : T.generic_args) : bool =
+    (item_id : T.assoc_item_id) (generics : T.generic_args) : bool =
   if c.match_with_trait_decl_refs then
     (* We match the trait decl ref *)
     (* We split the pattern between the trait decl ref and the associated item name *)
@@ -692,7 +692,7 @@ and match_trait_type (ctx : ctx) (c : match_config) (m : maps) (pid : pattern)
     (tr : T.trait_ref) (type_id : T.assoc_type_id) (generics : T.generic_args) :
     bool =
   match_trait_decl_ref_item ctx c m pid tr.trait_decl_ref
-    (GAstUtils.AssocIdType type_id) generics
+    (T.AssocIdType type_id) generics
 
 and match_generic_args (ctx : ctx) (c : match_config) (m : maps)
     (pgenerics : generic_args) (generics : T.generic_args) : bool =
@@ -738,7 +738,6 @@ and match_expr_with_const_generic (ctx : ctx) (c : match_config) (m : maps)
 
 let builtin_fun_id_to_string (fid : T.builtin_fun_id) : string =
   match fid with
-  | BoxNew -> "alloc::boxed::{Box<@T, alloc::alloc::Global>}::new"
   | ArrayToSliceShared -> "ArrayToSliceShared"
   | ArrayToSliceMut -> "ArrayToSliceMut"
   | ArrayRepeat -> "ArrayRepeat"
@@ -754,39 +753,12 @@ let builtin_fun_id_to_string (fid : T.builtin_fun_id) : string =
 let match_fn_ptr (ctx : ctx) (c : match_config) (p : pattern) (func : T.fn_ptr)
     : bool =
   match func.kind with
-  | FunId (FBuiltin fid) -> (
+  | FunId (FBuiltin fid) ->
       let to_name (s : string list) : T.name =
         List.map (fun s -> T.PeIdent (s, T.Disambiguator.of_int 0)) s
       in
-      match fid with
-      | BoxNew -> (
-          (* Slightly annoying because of the impl block.
-             TODO: we could use the functions which check if two patterns
-             are convertible. But we would need to update them (convertible
-             is too strong, we simply need unification).
-          *)
-          match p with
-          | [
-           PIdent ("alloc", _, g0);
-           PIdent ("boxed", _, g1);
-           PImpl (EComp box_impl);
-           PIdent ("new", _, g2);
-          ] -> (
-              g0 = [] && g1 = []
-              && match_generic_args ctx c (mk_empty_maps ()) g2 func.generics
-              &&
-              match box_impl with
-              | [ PIdent ("Box", _, _) ]
-              | [
-                  PIdent ("alloc", _, []);
-                  PIdent ("boxed", _, []);
-                  PIdent ("Box", _, _);
-                ] -> true
-              | _ -> false)
-          | _ -> false)
-      | _ ->
-          let name = builtin_fun_id_to_string fid in
-          match_name_with_generics ctx c p (to_name [ name ]) func.generics)
+      let name = builtin_fun_id_to_string fid in
+      match_name_with_generics ctx c p (to_name [ name ]) func.generics
   | FunId (FRegular fid) ->
       (* Lookup the function decl *)
       let d = Types.FunDeclId.Map.find fid ctx.crate.fun_decls in
@@ -812,13 +784,13 @@ let match_fn_ptr (ctx : ctx) (c : match_config) (p : pattern) (func : T.fn_ptr)
             let method_generics = TypesUtils.empty_generic_args in
             match_trait_decl_ref_item ctx c (mk_empty_maps ()) p
               { binder_value = trait_ref; binder_regions = [] }
-              (GAstUtils.AssocIdMethod item_id) method_generics
+              (T.AssocIdMethod item_id) method_generics
         | _ -> false
       in
       match_function_name || match_trait_ref
   | TraitMethod (tr, method_id) ->
       match_trait_decl_ref_item ctx c (mk_empty_maps ()) p tr.trait_decl_ref
-        (GAstUtils.AssocIdMethod method_id) func.generics
+        (T.AssocIdMethod method_id) func.generics
 
 let mk_name_with_generics_matcher (ctx : ctx) (c : match_config) (pat : string)
     : T.name -> T.generic_args -> bool =
@@ -1209,26 +1181,9 @@ let fn_ptr_to_pattern (ctx : ctx) (c : to_pat_config)
   let args = generic_args_to_pattern ctx c m func.generics in
   let pat =
     match func.kind with
-    | FunId (FBuiltin fid) -> (
-        match fid with
-        | BoxNew ->
-            let var = Some (VarName "T") in
-            let box_impl =
-              [
-                PIdent ("alloc", 0, []);
-                PIdent ("boxed", 0, []);
-                PIdent ("Box", 0, [ GExpr (EVar var) ]);
-              ]
-            in
-            [
-              PIdent ("alloc", 0, []);
-              PIdent ("boxed", 0, []);
-              PImpl (EComp box_impl);
-              PIdent ("new", 0, args);
-            ]
-        | _ ->
-            let fid = builtin_fun_id_to_string fid in
-            [ PIdent (fid, 0, args) ])
+    | FunId (FBuiltin fid) ->
+        let fid = builtin_fun_id_to_string fid in
+        [ PIdent (fid, 0, args) ]
     | FunId (FRegular fid) ->
         let d = Types.FunDeclId.Map.find fid ctx.crate.fun_decls in
         name_with_generics_to_pattern_aux ctx c m d.item_meta.name func.generics
