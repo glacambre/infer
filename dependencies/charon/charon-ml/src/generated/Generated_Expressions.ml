@@ -155,12 +155,6 @@ and cast_kind =
           namely, there may still be something like
           [Rc<dyn Trait<...>> -> Rc<T>] in the types. *)
 
-and field_proj_kind =
-  | ProjAdt of type_decl_id * variant_id option
-  | ProjTuple of int
-      (** If we project from a tuple, the projection kind gives the arity of the
-          tuple. *)
-
 and local_id = (LocalId.id[@visitors.opaque])
 
 (** Nullary operation *)
@@ -200,20 +194,12 @@ and place_kind =
       (** A global (const or static). Not present in MIR; introduced in
           [simplify_constants.rs]. *)
 
-(** Note that we don't have the equivalent of "downcasts". Downcasts are
-    actually necessary, for instance when initializing enumeration values: the
-    value is initially [Bottom], and we need a way of knowing the variant. For
-    example: [((_0 as Right).0: T2) = move _1;] In MIR, downcasts always happen
-    before field projections: in our internal language, we thus merge downcasts
-    and field projections. *)
+(** Projects a place to a subplace. *)
 and projection_elem =
   | Deref
       (** Dereference a shared/mutable reference, a box, or a raw pointer. *)
-  | Field of field_proj_kind * field_id
-      (** Projection from ADTs (variants, structures). We allow projections to
-          be used as left-values and right-values. We should never have
-          projections to fields of symbolic variants (they should have been
-          expanded before through a match). *)
+  | Field of variant_id option * field_id
+      (** Project to the field of an ADT (struct, union, or enum). *)
   | PtrMetadata
       (** A built-in pointer (a reference, raw pointer, or [Box]) in Rust is
           always a fat pointer: it contains an address and metadata for the
@@ -241,10 +227,8 @@ and projection_elem =
           - [to]
           - [from_end] *)
 
-(** TODO: we could factor out [Rvalue] and function calls (for LLBC, not ULLBC).
-    We can also factor out the unops, binops with the function calls. TODO: move
-    the aggregate kind to operands TODO: we should prefix the type variants with
-    "R" or "Rv", this would avoid collisions *)
+(** An expression that evaluates to a value. This is the RHS of an assignment.
+*)
 and rvalue =
   | Use of operand * with_retag  (** Lifts an operand as an rvalue. *)
   | RvRef of place * borrow_kind * operand

@@ -4,8 +4,8 @@ use itertools::Itertools;
 use std::mem;
 
 use crate::ast::*;
-use crate::common::CycleDetector;
 use crate::transform::{TransformCtx, ctx::TransformPass};
+use crate::utils::CycleDetector;
 
 type BoundRegionOutlives = RegionBinder<RegionOutlives>;
 type BoundTypeOutlives = RegionBinder<TypeOutlives>;
@@ -88,7 +88,7 @@ impl VisitAst for OutlivesGatherer<'_> {
                 }
             }
             TyKind::Adt(type_ref)
-                if let TypeId::Adt(type_id) = type_ref.id
+                if let Some(type_id) = type_ref.as_adt()
                     && let Some(decl) = self.type_decls.get(type_id)
                     && let Some(generics) = type_ref
                         .generics
@@ -142,7 +142,7 @@ impl<'a> ClosureOutlivesComputer<'a> {
     fn new(type_decls: &'a mut IndexMap<TypeDeclId, TypeDecl>) -> Self {
         let closure_tys = type_decls
             .iter()
-            .filter(|decl| matches!(decl.src, ItemSource::Closure { .. }))
+            .filter(|decl| matches!(decl.src, TypeSource::Closure { .. }))
             .map(|decl| (decl.def_id, CycleDetector::Unprocessed))
             .collect();
         Self {
@@ -163,7 +163,7 @@ impl<'a> ClosureOutlivesComputer<'a> {
             self.type_decls[type_id]
                 .kind
                 .dyn_visit(|type_ref: &TypeDeclRef| {
-                    if let TypeId::Adt(type_id) = type_ref.id
+                    if let Some(type_id) = type_ref.as_adt()
                         && self.closure_tys.get(&type_id).is_some()
                     {
                         dependencies.push(type_id);

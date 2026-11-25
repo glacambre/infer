@@ -26,8 +26,6 @@ pub fn compare(x: i32, y: i32) -> i32
         storage_dead(_4);
         _0 = copy x;
         storage_dead(_3);
-        storage_dead(y);
-        storage_dead(x);
         return;
     }
 
@@ -36,8 +34,6 @@ pub fn compare(x: i32, y: i32) -> i32
         storage_dead(_4);
         _0 = copy y;
         storage_dead(_3);
-        storage_dead(y);
-        storage_dead(x);
         return;
     }
 }

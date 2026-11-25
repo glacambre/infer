@@ -11,7 +11,6 @@ fn write<'_0>(a: &'_0 mut i32)
         _0 = ();
         (*a) = const 1i32;
         _0 = ();
-        storage_dead(a);
         return;
     }
 }

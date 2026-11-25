@@ -33,8 +33,6 @@ pub fn swi_nested(a: i32, b: i32) -> i32
         storage_dead(_4);
         _0 = const 3i32;
         storage_dead(_3);
-        storage_dead(b);
-        storage_dead(a);
         return;
     }
 
@@ -53,8 +51,6 @@ pub fn swi_nested(a: i32, b: i32) -> i32
     bb5: {
         storage_dead(_5);
         storage_dead(_3);
-        storage_dead(b);
-        storage_dead(a);
         return;
     }
 }

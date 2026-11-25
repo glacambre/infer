@@ -74,8 +74,8 @@ use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    ast::*, common::CycleDetector, formatter::IntoFormatter, ids::IndexMap, pretty::FmtWithCtx,
-    register_error,
+    ast::*, formatter::IntoFormatter, ids::IndexMap, pretty::FmtWithCtx, register_error,
+    utils::CycleDetector,
 };
 
 use crate::transform::{TransformCtx, ctx::TransformPass, utils::GenericsSource};
@@ -1312,22 +1312,35 @@ impl VisitAstMut for UpdateItemBody<'_> {
             self.process_poly_trait_decl_ref(&mut clause.trait_, self_path);
         }
     }
-    fn enter_item_source(&mut self, kind: &mut ItemSource) {
+    fn enter_fun_source(&mut self, kind: &mut FunSource) {
         match kind {
-            ItemSource::TopLevel
-            | ItemSource::Closure { .. }
-            | ItemSource::Spec { .. }
-            | ItemSource::TargetDependent { .. }
-            | ItemSource::VTableTy { .. }
-            | ItemSource::VTableInstance { .. }
-            | ItemSource::VTableMethodShim => {}
-            ItemSource::VTableInstanceMono => {}
+            FunSource::Normal
+            | FunSource::GlobalInitializer(_)
+            | FunSource::Spec { .. }
+            | FunSource::TargetDependent { .. }
+            | FunSource::VTableShim => {}
             // Inside method declarations, the implicit `Self` clause is the first clause.
-            ItemSource::TraitDecl { trait_ref, .. } => self.process_trait_decl_ref(
+            FunSource::TraitDefault { trait_ref, .. } => self.process_trait_decl_ref(
                 trait_ref,
                 TraitRefKind::Clause(DeBruijnVar::new_at_zero(TraitClauseId::ZERO)),
             ),
-            ItemSource::TraitImpl {
+            FunSource::TraitImpl {
+                impl_ref,
+                trait_ref,
+                ..
+            } => self.process_trait_decl_ref(trait_ref, TraitRefKind::TraitImpl(impl_ref.clone())),
+        }
+    }
+
+    fn enter_global_source(&mut self, kind: &mut GlobalSource) {
+        match kind {
+            GlobalSource::Normal | GlobalSource::VTableInstance { .. } => {}
+            // Inside trait default values, the implicit `Self` clause is the first clause.
+            GlobalSource::TraitDefault { trait_ref, .. } => self.process_trait_decl_ref(
+                trait_ref,
+                TraitRefKind::Clause(DeBruijnVar::new_at_zero(TraitClauseId::ZERO)),
+            ),
+            GlobalSource::TraitImpl {
                 impl_ref,
                 trait_ref,
                 ..
@@ -1337,10 +1350,8 @@ impl VisitAstMut for UpdateItemBody<'_> {
 
     // Update item generics.
     fn enter_type_decl_ref(&mut self, x: &mut TypeDeclRef) {
-        match x.id {
-            TypeId::Adt(id) => self.update_item_generics(id, &mut x.generics),
-            TypeId::Tuple => {}
-            TypeId::Builtin(_) => {}
+        if let Some(id) = x.as_adt() {
+            self.update_item_generics(id, &mut x.generics)
         }
     }
     fn enter_fun_decl_ref(&mut self, x: &mut FunDeclRef) {

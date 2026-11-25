@@ -1,6 +1,7 @@
 # Final ULLBC before serialization:
 
 // Full name: example::main
+#[allow(unused)]
 fn main()
 {
     let _0: (); // return

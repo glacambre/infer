@@ -328,7 +328,7 @@ and adt_ty_to_textual_typ crate (type_decl_ref : Charon.Generated_Types.type_dec
     Textual.Typ.t =
   (* TODO: Implement other adt types *)
   match type_decl_ref.id with
-  | TTuple ->
+  | TBuiltin TTuple ->
       if List.is_empty type_decl_ref.generics.types then Textual.Typ.Void
       else mk_tuple_struct_typ crate type_decl_ref.generics.types
   | TAdtId type_decl_id
@@ -496,7 +496,8 @@ let rec mk_exp_from_place ~loc (crate : Charon.UllbcAst.crate) (place_map : plac
   (* This skips the NonNull<T>.0 and Unqiue<T>.0 step *)
   | PlaceProjection (projection_place, Field _) when is_ty_pointer_type crate projection_place.ty ->
       mk_exp_from_place ~loc crate place_map projection_place
-  | PlaceProjection (projection_place, Field (ProjAdt (type_decl_id, variant), field_id)) ->
+  | PlaceProjection
+      (({ty= TAdt {id= TAdtId type_decl_id}} as projection_place), Field (variant, field_id)) ->
       let exp = mk_exp_from_place ~loc crate place_map projection_place in
       let type_decl = type_decl_map_find_id crate type_decl_id in
       let field =
@@ -507,7 +508,7 @@ let rec mk_exp_from_place ~loc (crate : Charon.UllbcAst.crate) (place_map : plac
       let field_exp = Textual.Exp.Field {exp; field} in
       field_exp
   | PlaceProjection
-      (({ty= TAdt {id= TTuple; generics}} as projection_place), Field (ProjTuple _, field_id)) ->
+      (({ty= TAdt {id= TBuiltin TTuple; generics}} as projection_place), Field (None, field_id)) ->
       let exp = mk_exp_from_place ~loc crate place_map projection_place in
       let tuple_type_name = mk_tuple_type_name crate generics.types in
       let name =
@@ -817,7 +818,7 @@ let mk_instr crate (place_map : place_map_ty) (statement : Charon.Generated_Ullb
   let loc = location_from_span statement.span in
   match statement.kind with
   (* Unit type case *)
-  | Assign (lhs, Aggregate (AggregatedAdt ({id= TTuple}, None, None), [])) ->
+  | Assign (lhs, Aggregate (AggregatedAdt ({id= TBuiltin TTuple}, None, None), [])) ->
       let exp1 = mk_exp_from_place ~loc crate place_map lhs in
       let exp2, typ = (Textual.Exp.Const Textual.Const.Null, Textual.Typ.Void) in
       let store_instr = Textual.Instr.Store {exp1; typ= Some typ; exp2; loc} in
@@ -862,8 +863,8 @@ let mk_instr crate (place_map : place_map_ty) (statement : Charon.Generated_Ullb
       [discriminant] @ stores
   (* Tuples *)
   | Assign
-      ( ({ty= TAdt {id= TTuple; generics}} as lhs)
-      , Aggregate (AggregatedAdt ({id= TTuple; _}, _, _), ops) ) ->
+      ( ({ty= TAdt {id= TBuiltin TTuple; generics}} as lhs)
+      , Aggregate (AggregatedAdt ({id= TBuiltin TTuple; _}, _, _), ops) ) ->
       let lhexp = mk_exp_from_place ~loc crate place_map lhs in
       let rvalues = List.map ~f:(mk_exp_from_operand ~loc crate place_map) ops in
       let tuple_type_name = mk_tuple_type_name crate generics.types in
@@ -1040,9 +1041,9 @@ let mk_tuple_type crate (local : Charon.Generated_GAst.local) =
   let rec mk_tuple (ty : Charon.Generated_Types.ty) =
     match ty with
     (* Unit Type *)
-    | TAdt {id= TTuple; generics= {types= []}} ->
+    | TAdt {id= TBuiltin TTuple; generics= {types= []}} ->
         []
-    | TAdt {id= TTuple; generics} ->
+    | TAdt {id= TBuiltin TTuple; generics} ->
         let tuple_type_name = mk_tuple_type_name crate generics.types in
         let fields =
           generics.types

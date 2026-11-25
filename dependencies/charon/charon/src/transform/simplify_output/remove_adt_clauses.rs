@@ -8,12 +8,10 @@
 
 use std::collections::HashSet;
 
-use derive_generic_visitor::*;
-
 use crate::ast::*;
-use crate::common::CycleDetector;
 use crate::ids::{IndexMap, IndexVec};
 use crate::transform::{TransformCtx, ctx::TransformPass};
+use crate::utils::CycleDetector;
 
 /// Compute whether a trait has associated types, even through supertraits.
 fn has_assoc_types(
@@ -92,7 +90,7 @@ impl VisitAstMut for RemoveAdtClausesVisitor<'_> {
     }
 
     fn enter_type_decl_ref(&mut self, tref: &mut TypeDeclRef) {
-        if let TypeId::Adt(id) = tref.id
+        if let Some(id) = tref.as_adt()
             && !self.untouchable_adts.contains(&id)
         {
             tref.generics.trait_refs.clear();

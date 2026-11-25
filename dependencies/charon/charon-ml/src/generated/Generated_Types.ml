@@ -205,8 +205,8 @@ and binder_kind =
   | BKDyn  (** Binder used for [dyn Trait] existential predicates. *)
   | BKOther  (** Some other use of a binder outside the main Charon ast. *)
 
-(** An built-in function identifier, identifying a function coming from a
-    standard library. *)
+(** A built-in function, representing a specific built-in function that's part
+    of the LLBC semantics. *)
 and builtin_fun_id =
   | BoxNew
       (** Used instead of [alloc::boxed::Box::new] when [--treat-box-as-builtin]
@@ -267,6 +267,9 @@ and builtin_impl_data =
   | BuiltinAsyncFnOnce
   | BuiltinCoroutine
   | BuiltinFuture
+  | BuiltinTryAsDynCompatible
+      (** Auto-trait used for [try_as_dyn] (see
+          https://github.com/rust-lang/rust/issues/144361) *)
   | BuiltinNoopDestruct
       (** An impl of [Destruct] for a type with no drop glue. *)
   | BuiltinUntrackedDestruct
@@ -301,6 +304,7 @@ and builtin_index_op = {
     TODO: update to not hardcode the types (except [Box] maybe) and be more
     modular. TODO: move to builtins.rs? *)
 and builtin_ty =
+  | TTuple  (** Tuple type. *)
   | TBox  (** Boxes are de facto a primitive type. *)
   | TStr  (** Primitive type *)
 
@@ -325,36 +329,10 @@ and const_generic_param = {
 }
 
 and const_generic_var_id = (ConstGenericVarId.id[@visitors.opaque])
+
+(** A constant expression. *)
 and constant_expr = { kind : constant_expr_kind; ty : ty }
 
-(** A constant expression.
-
-    Only the [[ConstantExprKind::Literal]] and [[ConstantExprKind::Var]] cases
-    are left in the final LLBC.
-
-    The other cases come from a straight translation from the MIR:
-
-    [[ConstantExprKind::Adt]] case: It is a bit annoying, but rustc treats some
-    ADT and tuple instances as constants when generating MIR:
-    - an enumeration with one variant and no fields is a constant.
-    - a structure with no field is a constant.
-    - sometimes, Rust stores the initialization of an ADT as a constant (if all
-      the fields are constant) rather than as an aggregated value
-
-    We later desugar those to regular ADTs, see [regularize_constant_adts.rs].
-
-    [[ConstantExprKind::Global]] case: access to a global variable. We later
-    desugar it to a copy of a place global.
-
-    [[ConstantExprKind::Ref]] case: reference to a constant value. We later
-    desugar it to a separate statement.
-
-    [[ConstantExprKind::FnPtr]] case: a function pointer (to a top-level
-    function).
-
-    Remark: MIR seems to forbid more complex expressions like paths. For
-    instance, reading the constant [a.b] is translated to
-    [{ _1 = const a; _2 = (_1.0) }]. *)
 and constant_expr_kind =
   | CLiteral of literal
   | CAdt of variant_id option * constant_expr list
@@ -440,6 +418,8 @@ and dyn_predicate = {
 }
 
 and field_id = (FieldId.id[@visitors.opaque])
+
+(** Reference to a function, possibly indirected via a trait. *)
 and fn_ptr = { kind : fn_ptr_kind; generics : generic_args }
 
 and fn_ptr_kind =
@@ -454,7 +434,7 @@ and fun_decl_ref = {
   generics : generic_args;  (** Generic arguments passed to the function. *)
 }
 
-(** A function identifier. See [crate::ullbc_ast::Terminator] *)
+(** A regular or builtin function. *)
 and fun_id =
   | FRegular of fun_decl_id
       (** A "regular" function (function local to the crate, external function
@@ -796,14 +776,13 @@ and type_decl_ref = { id : type_id; generics : generic_args }
 
 (** Type identifier.
 
-    Allows us to factorize the code for built-in types, adts and tuples *)
+    Allows us to factorize the code for built-in types and ADTs. *)
 and type_id =
   | TAdtId of type_decl_id
       (** A "regular" ADT type.
 
           Includes transparent ADTs and opaque ADTs (local ADTs marked as
           opaque, and external ADTs). *)
-  | TTuple
   | TBuiltin of builtin_ty
       (** Built-in type. Either a primitive type like array or slice, or a
           non-primitive type coming from a standard library and that we handle
@@ -878,11 +857,6 @@ and variant_id = (VariantId.id[@visitors.opaque])
 (** Describes modifiers to the alignment and packing of the corresponding type.
     Represents [repr(align(n))] and [repr(packed(n))]. *)
 type alignment_modifier = Align of int | Pack of int
-
-and assoc_item_id =
-  | AssocIdType of assoc_type_id
-  | AssocIdMethod of trait_method_id
-  | AssocIdConst of assoc_const_id
 
 (** Additional information for closures. *)
 and closure_info = {
@@ -976,6 +950,7 @@ and item_meta = {
           identifier. *)
 }
 
+(** How much to translate for a given item. *)
 and item_opacity =
   | Transparent  (** Translate the item fully. *)
   | Foreign
@@ -997,89 +972,6 @@ and item_opacity =
       (** Translate nothing of this item. The corresponding map will not have an
           entry for the [ItemId]. Useful when even the signature of the item
           causes errors. *)
-
-(** Item kind: whether this function/const is part of a trait declaration, trait
-    implementation, or neither.
-
-    Example:
-    {@rust[
-      trait Foo {
-          fn bar(x : u32) -> u32; // trait item decl without default
-
-          fn baz(x : bool) -> bool { x } // trait item decl with default
-      }
-
-      impl Foo for ... {
-          fn bar(x : u32) -> u32 { x } // trait item implementation
-      }
-
-      fn test(...) { ... } // regular
-
-      impl Type {
-          fn test(...) { ... } // regular
-      }
-    ]} *)
-and item_source =
-  | TopLevelItem  (** This item stands on its own. *)
-  | ClosureItem of closure_info
-      (** This is a closure in a function body.
-
-          Fields:
-          - [info] *)
-  | SpecItem of spec_kind * item_id
-      (** This item is a specification attached to another item, via
-          [#[charon::precondition]]/[#[charon::postcondition]].
-
-          Fields:
-          - [kind]
-          - [item] *)
-  | TraitDeclItem of trait_decl_ref * assoc_item_id
-      (** This is the default value of an associated const or method in a trait
-          declaration.
-
-          Fields:
-          - [trait_ref]: The trait declaration this item belongs to.
-          - [item_id]: The associated item this corresponds to. Note that a
-            function could have [AssocItemId::Const] if it's the initializer of
-            a trait const. *)
-  | TraitImplItem of trait_impl_ref * trait_decl_ref * assoc_item_id * bool
-      (** This is an associated const or method in a trait implementation.
-
-          Fields:
-          - [impl_ref]: The trait implementation the method belongs to.
-          - [trait_ref]: The trait declaration that the impl block implements.
-          - [item_id]: The associated item this corresponds to. Note that a
-            function could have [AssocItemId::Const] if it's the initializer of
-            a trait const.
-          - [reuses_default]: True if the trait decl had a default
-            implementation for this function/const and this item is a copy of
-            the default item. *)
-  | TargetDependentItem of fun_decl_ref
-      (** This function is a target-specific variant behind a [TargetDispatch]
-          façade. The dispatcher is the function with the [Body::TargetDispatch]
-          body that dispatches to this function.
-
-          Fields:
-          - [dispatcher] *)
-  | VTableTyItem of dyn_predicate * v_table_field list * field_id option list
-      (** This is a vtable struct for a trait.
-
-          Fields:
-          - [dyn_predicate]: The [dyn Trait] predicate implemented by this
-            vtable.
-          - [field_map]: Record what each vtable field means.
-          - [supertrait_map]: For each implied clause that is also a supertrait
-            clause, reords which field id corresponds to it. *)
-  | VTableInstanceItem of trait_impl_ref
-      (** This is a vtable value for an impl.
-
-          Fields:
-          - [impl_ref] *)
-  | VTableMethodShimItem
-      (** The method shim wraps a concrete implementation of a method into a
-          function that takes [dyn Trait] as its [Self] type. This shim casts
-          the receiver to the known concrete type and calls the real method. *)
-  | VTableInstanceMonoItem
 
 (** A representation of all the valid lang items in Rust. *)
 and rustc_lang_item =
@@ -1116,6 +1008,7 @@ and rustc_lang_item =
   | RustcLangItemAsyncDropInPlace  (**The [async_drop_in_place] lang item. *)
   | RustcLangItemCoerceUnsized  (**The [coerce_unsized] lang item. *)
   | RustcLangItemDispatchFromDyn  (**The [dispatch_from_dyn] lang item. *)
+  | RustcLangItemTryAsDyn  (**The [try_as_dyn] lang item. *)
   | RustcLangItemTransmuteOpts  (**The [transmute_opts] lang item. *)
   | RustcLangItemTransmuteTrait  (**The [transmute_trait] lang item. *)
   | RustcLangItemAdd  (**The [add] lang item. *)
@@ -1143,9 +1036,12 @@ and rustc_lang_item =
   | RustcLangItemIndex  (**The [index] lang item. *)
   | RustcLangItemIndexMut  (**The [index_mut] lang item. *)
   | RustcLangItemUnsafeCell  (**The [unsafe_cell] lang item. *)
+  | RustcLangItemCovariantUnsafeCell
+      (**The [covariant_unsafe_cell] lang item. *)
   | RustcLangItemUnsafePinned  (**The [unsafe_pinned] lang item. *)
   | RustcLangItemVaArgSafe  (**The [va_arg_safe] lang item. *)
   | RustcLangItemVaList  (**The [va_list] lang item. *)
+  | RustcLangItemComplex  (**The [complex] lang item. *)
   | RustcLangItemDeref  (**The [deref] lang item. *)
   | RustcLangItemDerefMut  (**The [deref_mut] lang item. *)
   | RustcLangItemDerefPure  (**The [deref_pure] lang item. *)
@@ -1182,6 +1078,7 @@ and rustc_lang_item =
   | RustcLangItemPartialOrd  (**The [partial_ord] lang item. *)
   | RustcLangItemCVoid  (**The [c_void] lang item. *)
   | RustcLangItemType  (**The [type_info] lang item. *)
+  | RustcLangItemTypeGeneric  (**The [type_info_generic] lang item. *)
   | RustcLangItemTypeId  (**The [type_id] lang item. *)
   | RustcLangItemPanic  (**The [panic] lang item. *)
   | RustcLangItemPanicNounwind  (**The [panic_nounwind] lang item. *)
@@ -1232,6 +1129,8 @@ and rustc_lang_item =
       (**The [panic_const_gen_fn_none_panic] lang item. *)
   | RustcLangItemPanicNullPointerDereference
       (**The [panic_null_pointer_dereference] lang item. *)
+  | RustcLangItemPanicNullReferenceConstructed
+      (**The [panic_null_reference_constructed] lang item. *)
   | RustcLangItemPanicInvalidEnumConstruction
       (**The [panic_invalid_enum_construction] lang item. *)
   | RustcLangItemPanicCoroutineResumedDrop
@@ -1257,7 +1156,6 @@ and rustc_lang_item =
           current target) as well as the user-defined [fn main] from the binary
           crate. *)
   | RustcLangItemEhPersonality  (**The [eh_personality] lang item. *)
-  | RustcLangItemEhCatchTypeinfo  (**The [eh_catch_typeinfo] lang item. *)
   | RustcLangItemCompilerMove  (**The [compiler_move] lang item. *)
   | RustcLangItemCompilerCopy  (**The [compiler_copy] lang item. *)
   | RustcLangItemOwnedBox  (**The [owned_box] lang item. *)
@@ -1341,8 +1239,9 @@ and rustc_lang_item =
   | RustcLangItemFieldType  (**The [field_type] lang item. *)
   | RustcLangItemFieldOffset  (**The [field_offset] lang item. *)
   | RustcLangItemFrom  (**The [From] lang item. *)
+  | RustcLangItemFromFn  (**The [from] lang item. *)
 
-(** Simplified type layout information.
+(** Type layout information.
 
     Does not include information about niches. If the type does not have a fully
     known layout (e.g. it is ?Sized) some of the layout parts are not available.
@@ -1459,8 +1358,6 @@ and repr_options = {
   explicit_discr_type : bool;
 }
 
-and spec_kind = Precondition | Postcondition
-
 (** A type declaration.
 
     Types can be opaque or transparent.
@@ -1478,9 +1375,9 @@ and type_decl = {
   def_id : type_decl_id;
   item_meta : item_meta;  (** Meta information associated with the item. *)
   generics : generic_params;
-  src : item_source;
+  src : type_source;
       (** The context of the type: distinguishes top-level items from
-          closure-related items. *)
+          closure-related items etc. *)
   kind : type_decl_kind;  (** The type kind: enum, struct, or opaque. *)
   layout : (string * layout) list;
       (** The layout of the type for each target. Information may be partial
@@ -1504,6 +1401,24 @@ and type_decl_kind =
   | TDeclError of string
       (** Used if an error happened during the extraction, and we don't panic on
           error. *)
+
+(** Where a given type came from. *)
+and type_source =
+  | NormalType  (** A normal type declaration. *)
+  | ClosureType of closure_info
+      (** The struct that carries the captured variables of a closure.
+
+          Fields:
+          - [info] *)
+  | VTableType of dyn_predicate * v_table_field list * field_id option list
+      (** Defines the vtable struct for a trait.
+
+          Fields:
+          - [dyn_predicate]: The [dyn Trait] predicate implemented by this
+            vtable.
+          - [field_map]: Record what each vtable field means.
+          - [supertrait_map]: For each implied clause that is also a supertrait
+            clause, records which field of the vtable corresponds to it. *)
 
 and v_table_field =
   | VTableSize

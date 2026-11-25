@@ -25,10 +25,6 @@ fn add<'_0>(self: &'_0 Adder, a: i32, b: i32) -> i32
         _0 = move _6;
         storage_dead(_5);
         storage_dead(_4);
-        storage_dead(_6);
-        storage_dead(b);
-        storage_dead(a);
-        storage_dead(self);
         return;
     }
 }

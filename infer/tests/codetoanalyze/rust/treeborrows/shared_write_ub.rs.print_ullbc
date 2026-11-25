@@ -19,7 +19,6 @@ fn f<'_0>(a: &'_0 i32)
         (*p) = const 1i32;
         _0 = ();
         storage_dead(p);
-        storage_dead(a);
         return;
     }
 }

@@ -6,10 +6,10 @@ use crate::hax;
 use crate::hax::{BaseState, Symbol};
 use rustc_middle::ty;
 
-use super::translate_ctx::{ItemTransCtx, TraitImplSource, TransItemSourceKind};
+use super::translate_ctx::{ItemTransCtx, TransImplSource, TransItemSourceKind};
 use charon_lib::ast::*;
-use charon_lib::common::CycleDetector;
 use charon_lib::ids::IndexVec;
+use charon_lib::utils::CycleDetector;
 
 /// A level of binding for type-level variables. Each item has a top-level binding level
 /// corresponding to the parameters and clauses to the items. We may then encounter inner binding
@@ -521,7 +521,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
             self.the_only_binder_mut().closure_upvar_tys = Some(upvar_tys);
 
             // Add the lifetime generics coming from the higher-kindedness of the signature.
-            if let TransItemSourceKind::TraitImpl(TraitImplSource::Closure(..))
+            if let TransItemSourceKind::TraitImpl(TransImplSource::Closure(..))
             | TransItemSourceKind::ClosureMethod(..)
             | TransItemSourceKind::ClosureAsFnCast = kind
             {

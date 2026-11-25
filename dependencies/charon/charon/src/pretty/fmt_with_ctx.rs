@@ -1,12 +1,12 @@
 //! Utilities for pretty-printing (u)llbc.
 use crate::{
-    common::{TAB_INCR, repeat_except_first},
+    ast,
     formatter::*,
-    gast,
     ids::IndexVec,
     llbc_ast::{self as llbc, *},
     transform::utils::GenericsSource,
     ullbc_ast::{self as ullbc, *},
+    utils::{TAB_INCR, repeat_except_first},
 };
 use either::Either;
 use itertools::Itertools;
@@ -122,6 +122,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for BuiltinAssertKind {
                 write!(f, "misaligned_pointer_dereference")
             }
             BuiltinAssertKind::NullPointerDereference => write!(f, "null_pointer_dereference"),
+            BuiltinAssertKind::NullReferenceCreated => write!(f, "null_reference_created"),
             BuiltinAssertKind::InvalidEnumConstruction(..) => {
                 write!(f, "invalid_enum_construction")
             }
@@ -288,7 +289,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for ullbc::BlockData {
     }
 }
 
-impl<C: AstFormatter> FmtWithCtx<C> for gast::Body {
+impl<C: AstFormatter> FmtWithCtx<C> for ast::Body {
     fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let tab = ctx.indent();
         write!(f, "\n{tab}")?;
@@ -1142,6 +1143,13 @@ impl ItemMeta {
             writeln!(f, "// Full name: {}", self.name.full_name(ctx))?;
         }
 
+        for attr in &self.attr_info.attributes {
+            // Doc-comments are long and don't affect the semantics; skip them.
+            if attr.is_doc_comment() {
+                continue;
+            }
+            writeln!(f, "{tab}{}", attr.with_ctx(ctx))?;
+        }
         if let Some(id) = &self.lang_item {
             writeln!(f, "{tab}#[lang_item({id:?})]")?;
         }
@@ -1240,7 +1248,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for NullOp {
             NullOp::SizeOf => "size_of",
             NullOp::AlignOf => "align_of",
             &NullOp::OffsetOf(ref ty, variant, field) => {
-                let tid = *ty.id.as_adt().expect("found offset_of of a non-adt type");
+                let tid = ty.adt_id();
                 write!(f, "offset_of({}.", ty.with_ctx(ctx))?;
                 if let Some(variant) = variant {
                     ctx.format_enum_variant_name(f, tid, variant)?;
@@ -1338,29 +1346,26 @@ impl<C: AstFormatter> FmtWithCtx<C> for Place {
             PlaceKind::Projection(subplace, projection) => {
                 let sub = subplace.with_ctx(ctx);
                 match projection {
-                    ProjectionElem::Deref => {
-                        write!(f, "(*{sub})")
-                    }
-                    ProjectionElem::Field(proj_kind, field_id) => match proj_kind {
-                        FieldProjKind::Adt(adt_id, opt_variant_id) => {
-                            match opt_variant_id {
-                                None => write!(f, "{sub}.")?,
-                                Some(variant_id) => {
-                                    write!(f, "({sub} as variant ")?;
-                                    ctx.format_enum_variant(f, *adt_id, *variant_id)?;
-                                    write!(f, ").")?;
+                    ProjectionElem::Deref => write!(f, "(*{sub})"),
+                    ProjectionElem::Field(variant_id, field_id) => {
+                        let tref = subplace.ty().as_adt().unwrap();
+                        match tref.as_adt() {
+                            Some(adt_id) => {
+                                match variant_id {
+                                    None => write!(f, "{sub}.")?,
+                                    Some(variant_id) => {
+                                        write!(f, "({sub} as variant ")?;
+                                        ctx.format_enum_variant(f, adt_id, *variant_id)?;
+                                        write!(f, ").")?;
+                                    }
                                 }
+                                ctx.format_field_name(f, adt_id, *variant_id, *field_id)
                             }
-                            ctx.format_field_name(f, *adt_id, *opt_variant_id, *field_id)?;
-                            Ok(())
+                            None if tref.is_tuple() => write!(f, "{sub}.{field_id}"),
+                            None => unreachable!("field projection on builtin type"),
                         }
-                        FieldProjKind::Tuple(_) => {
-                            write!(f, "{sub}.{field_id}")
-                        }
-                    },
-                    ProjectionElem::PtrMetadata => {
-                        write!(f, "{sub}.metadata")
                     }
+                    ProjectionElem::PtrMetadata => write!(f, "{sub}.metadata"),
                     ProjectionElem::Index {
                         offset,
                         from_end: true,
@@ -1428,6 +1433,133 @@ impl PolyTraitDeclRef {
     }
 }
 
+impl<C: AstFormatter> FmtWithCtx<C> for Attribute {
+    fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut attr = String::new();
+        self.fmt_unindented(ctx, &mut attr)?;
+        let sep = format!("\n{}", ctx.indent());
+        write!(f, "{}", attr.lines().format(sep.as_str()))
+    }
+}
+
+impl Attribute {
+    fn fmt_unindented<C: AstFormatter>(&self, ctx: &C, f: &mut impl fmt::Write) -> fmt::Result {
+        match self {
+            Attribute::Opaque => write!(f, "#[charon::opaque]"),
+            Attribute::Exclude => write!(f, "#[charon::exclude]"),
+            Attribute::Rename(name) => write!(f, "#[charon::rename(\"{name}\")]"),
+            Attribute::VariantsPrefix(prefix) => {
+                write!(f, "#[charon::variants_prefix(\"{prefix}\")]")
+            }
+            Attribute::VariantsSuffix(suffix) => {
+                write!(f, "#[charon::variants_suffix(\"{suffix}\")]")
+            }
+            Attribute::Transparent => write!(f, "#[charon::transparent]"),
+            Attribute::IsPrecondition(id) => {
+                write!(f, "#[charon::precondition] // of {}", id.with_ctx(ctx))
+            }
+            Attribute::IsPostcondition(id) => {
+                write!(f, "#[charon::postcondition] // of {}", id.with_ctx(ctx))
+            }
+            Attribute::HasPrecondition(id) => {
+                let id = ItemId::Fun(*id);
+                write!(f, "// precondition: {}", id.with_ctx(ctx))
+            }
+            Attribute::HasPostcondition(id) => {
+                let id = ItemId::Fun(*id);
+                write!(f, "// postcondition: {}", id.with_ctx(ctx))
+            }
+            Attribute::DocComment(comment) => {
+                write!(
+                    f,
+                    "{}",
+                    comment
+                        .lines()
+                        .map(|line| format!("///{line}"))
+                        .format("\n")
+                )
+            }
+            Attribute::Builtin(kind) => write!(f, "#[{kind}]"),
+            Attribute::Unknown(attr) => write!(f, "#[{attr}]"),
+        }
+    }
+}
+
+/// Print a built-in attribute the way it is written in the source.
+impl Display for from_rustc::AttributeKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use from_rustc::AttributeKind;
+        match self {
+            AttributeKind::AutomaticallyDerived => write!(f, "automatically_derived"),
+            AttributeKind::Cold => write!(f, "cold"),
+            AttributeKind::Deprecated { deprecation, .. } => {
+                write!(f, "deprecated")?;
+                let since = match &deprecation.since {
+                    from_rustc::DeprecatedSince::RustcVersion(v) => {
+                        Some(format!("{}.{}.{}", v.major, v.minor, v.patch))
+                    }
+                    from_rustc::DeprecatedSince::Future => Some("future".to_owned()),
+                    from_rustc::DeprecatedSince::NonStandard(since) => Some(since.to_string()),
+                    from_rustc::DeprecatedSince::Unspecified | from_rustc::DeprecatedSince::Err => {
+                        None
+                    }
+                };
+                let since = since.map(|since| format!("since = \"{since}\""));
+                let note = deprecation
+                    .note
+                    .as_ref()
+                    .map(|note| format!("note = \"{}\"", note.name));
+                let args = since.into_iter().chain(note).format(", ").to_string();
+                if !args.is_empty() {
+                    write!(f, "({args})")?;
+                }
+                Ok(())
+            }
+            AttributeKind::Fundamental => write!(f, "fundamental"),
+            AttributeKind::Ignore { reason, .. } => {
+                write!(f, "ignore")?;
+                if let Some(reason) = reason {
+                    write!(f, " = \"{reason}\"")?;
+                }
+                Ok(())
+            }
+            AttributeKind::Inline(inline, _) => match inline {
+                from_rustc::InlineAttr::None => write!(f, "inline"),
+                from_rustc::InlineAttr::Hint => write!(f, "inline(hint)"),
+                from_rustc::InlineAttr::Always => write!(f, "inline(always)"),
+                from_rustc::InlineAttr::Never => write!(f, "inline(never)"),
+                from_rustc::InlineAttr::Force { .. } => write!(f, "rustc_force_inline"),
+            },
+            AttributeKind::MayDangle(_) => write!(f, "may_dangle"),
+            AttributeKind::Naked(_) => write!(f, "naked"),
+            AttributeKind::NoLink => write!(f, "no_link"),
+            AttributeKind::NoMangle(_) => write!(f, "no_mangle"),
+            AttributeKind::NonExhaustive(_) => write!(f, "non_exhaustive"),
+            AttributeKind::Optimize(optimize, _) => match optimize {
+                from_rustc::OptimizeAttr::Default => write!(f, "optimize(default)"),
+                from_rustc::OptimizeAttr::DoNotOptimize => write!(f, "optimize(none)"),
+                from_rustc::OptimizeAttr::Speed => write!(f, "optimize(speed)"),
+                from_rustc::OptimizeAttr::Size => write!(f, "optimize(size)"),
+            },
+            AttributeKind::RustcAlign { align, .. } => write!(f, "rustc_align({align})"),
+            AttributeKind::RustcIntrinsic => write!(f, "rustc_intrinsic"),
+            AttributeKind::RustcTestEntrypointMarker => write!(f, "rustc_test_entrypoint_marker"),
+            AttributeKind::ShouldPanic { reason } => {
+                write!(f, "should_panic")?;
+                if let Some(reason) = reason {
+                    write!(f, "(expected = \"{reason}\")")?;
+                }
+                Ok(())
+            }
+            AttributeKind::TargetFeature { features, .. } => {
+                let features = features.iter().map(|(feature, _)| feature).format(",");
+                write!(f, "target_feature(enable = \"{features}\")")
+            }
+            AttributeKind::TrackCaller(_) => write!(f, "track_caller"),
+        }
+    }
+}
+
 impl Display for RawAttribute {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
         write!(f, "{}", self.path)?;
@@ -1456,21 +1588,22 @@ impl<C: AstFormatter> FmtWithCtx<C> for ConstantExpr {
             ConstantExprKind::Adt(variant_id, values) => {
                 let values = values.iter().map(|v| v.with_ctx(ctx));
                 match self.ty.as_adt() {
-                    Some(ty_ref) => match ty_ref.id {
-                        TypeId::Tuple => {
+                    Some(ty_ref) => match ty_ref.as_builtin() {
+                        Some(BuiltinTy::Tuple) => {
                             let trailing_comma = if values.len() == 1 { "," } else { "" };
                             let values = values.format(", ");
                             write!(f, "({values}{trailing_comma})")
                         }
-                        TypeId::Builtin(BuiltinTy::Box) => {
+                        Some(BuiltinTy::Box) => {
                             let values = values.format(", ");
                             write!(f, "Box({values})")
                         }
-                        TypeId::Builtin(BuiltinTy::Str) => {
+                        Some(BuiltinTy::Str) => {
                             let values = values.format(", ");
                             write!(f, "[{values}]")
                         }
-                        TypeId::Adt(ty_id) => {
+                        None => {
+                            let ty_id = ty_ref.adt_id();
                             match variant_id {
                                 None => ty_id.fmt_with_ctx(ctx, f)?,
                                 Some(variant_id) => {
@@ -1726,16 +1859,17 @@ impl<C: AstFormatter> FmtWithCtx<C> for Rvalue {
                 let ops_s = ops.iter().map(|op| op.with_ctx(ctx)).format(", ");
                 match kind {
                     AggregateKind::Adt(ty_ref, variant_id, field_id) => {
-                        match ty_ref.id {
-                            TypeId::Tuple => {
+                        match ty_ref.as_builtin() {
+                            Some(BuiltinTy::Tuple) => {
                                 let trailing_comma = if ops.len() == 1 { "," } else { "" };
                                 write!(f, "({ops_s}{trailing_comma})")
                             }
-                            TypeId::Builtin(BuiltinTy::Box) => write!(f, "Box({})", ops_s),
-                            TypeId::Builtin(BuiltinTy::Str) => {
+                            Some(BuiltinTy::Box) => write!(f, "Box({})", ops_s),
+                            Some(BuiltinTy::Str) => {
                                 write!(f, "[{}]", ops_s)
                             }
-                            TypeId::Adt(ty_id) => {
+                            None => {
+                                let ty_id = ty_ref.adt_id();
                                 match variant_id {
                                     None => ty_id.fmt_with_ctx(ctx, f)?,
                                     Some(variant_id) => {
@@ -2001,12 +2135,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for llbc::Statement {
                     let ctx1 = &ctx.increase_indent();
                     let inner_tab1 = ctx1.indent();
                     let ctx2 = &ctx1.increase_indent();
-                    let discr_type: Option<TypeDeclId> = discr
-                        .ty
-                        .kind()
-                        .as_adt()
-                        .and_then(|tref| tref.id.as_adt())
-                        .copied();
+                    let discr_type = discr.ty.as_adt_id();
                     for (cases, st) in maps {
                         write!(f, "{inner_tab1}",)?;
                         // Note that there may be several pattern values
@@ -2428,8 +2557,8 @@ impl<C: AstFormatter> FmtWithCtx<C> for TraitTypeConstraint {
 impl<C: AstFormatter> FmtWithCtx<C> for Ty {
     fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind() {
-            TyKind::Adt(tref) => match tref.id {
-                TypeId::Tuple => {
+            TyKind::Adt(tref) => match tref.as_builtin() {
+                Some(BuiltinTy::Tuple) => {
                     let generics = tref.generics.fmt_explicits(ctx).format(", ");
                     let trailing_comma = if tref.generics.types.len() == 1 {
                         ","
@@ -2587,7 +2716,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for TypeDeclRef {
 impl<C: AstFormatter> FmtWithCtx<C> for TypeId {
     fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TypeId::Tuple => Ok(()),
+            TypeId::Builtin(BuiltinTy::Tuple) => Ok(()),
             TypeId::Adt(def_id) => write!(f, "{}", def_id.with_ctx(ctx)),
             TypeId::Builtin(aty) => write!(f, "{}", aty.get_name().with_ctx(ctx)),
         }

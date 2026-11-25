@@ -44,9 +44,6 @@ use std::mem;
 
 use super::translate_crate::TransItemSourceKind;
 use super::translate_ctx::*;
-use charon_lib::ast::ullbc_ast_utils::BodyBuilder;
-use charon_lib::ast::*;
-use charon_lib::ids::IndexVec;
 use charon_lib::ullbc_ast::*;
 
 pub fn translate_closure_kind(kind: &hax::ClosureKind) -> ClosureKind {
@@ -170,7 +167,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         closure: &hax::ClosureArgs,
         target_kind: ClosureKind,
     ) -> Result<RegionBinder<TraitImplRef>, Error> {
-        let kind = TransItemSourceKind::TraitImpl(TraitImplSource::Closure(target_kind));
+        let kind = TransItemSourceKind::TraitImpl(TransImplSource::Closure(target_kind));
         let bound_dref = self.translate_closure_bound_ref_with_late_bound(span, closure, kind)?;
         Ok(bound_dref.map(|dref| dref.try_into().unwrap()))
     }
@@ -185,7 +182,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         self.translate_item(
             span,
             &closure.item,
-            TransItemSourceKind::TraitImpl(TraitImplSource::Closure(target_kind)),
+            TransItemSourceKind::TraitImpl(TransImplSource::Closure(target_kind)),
         )
     }
 
@@ -365,15 +362,10 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
                 }));
 
                 let untupled_args = tupled_ty.as_tuple().unwrap();
-                let closure_arg_count = untupled_args.len();
                 let new_stts = untupled_args.iter().cloned().enumerate().map(|(i, ty)| {
-                    let nth_field = tupled_arg.clone().project(
-                        ProjectionElem::Field(
-                            FieldProjKind::Tuple(closure_arg_count),
-                            FieldId::new(i),
-                        ),
-                        ty,
-                    );
+                    let nth_field = tupled_arg
+                        .clone()
+                        .project(ProjectionElem::Field(None, FieldId::new(i)), ty);
                     let local_id = LocalId::new(i + 3);
                     Statement::new(
                         span,
@@ -499,10 +491,10 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         let method_id = self.translate_trait_method_id(implemented_trait.id, &vimpl.methods[0])?;
 
         let impl_ref = self.translate_closure_impl_ref(span, args, target_kind)?;
-        let src = ItemSource::TraitImpl {
+        let src = FunSource::TraitImpl {
             impl_ref,
             trait_ref: implemented_trait,
-            item_id: method_id.into(),
+            item_id: method_id,
             reuses_default: false,
         };
 
@@ -529,7 +521,6 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             generics: self.into_generics(),
             signature: Box::new(signature),
             src,
-            is_global_initializer: None,
             body,
         })
     }
@@ -560,7 +551,12 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             ClosureKind::FnMut => fn_mut_impl.as_ref().unwrap(),
             ClosureKind::Fn => fn_impl.as_ref().unwrap(),
         };
-        let mut timpl = self.translate_virtual_trait_impl(def_id, item_meta, vimpl)?;
+        let mut timpl = self.translate_virtual_trait_impl(
+            def_id,
+            item_meta,
+            TraitImplSource::Closure { kind: target_kind },
+            vimpl,
+        )?;
 
         // Construct the `call_*` method reference.
         let trait_decl_id = timpl.impl_trait.id;
@@ -674,8 +670,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             item_meta,
             generics: self.into_generics(),
             signature: Box::new(signature),
-            src: ItemSource::TopLevel,
-            is_global_initializer: None,
+            src: FunSource::Normal,
             body,
         })
     }

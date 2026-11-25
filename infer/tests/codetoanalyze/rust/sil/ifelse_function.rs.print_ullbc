@@ -19,18 +19,12 @@ fn ifelse(b: bool, x: i32, y: i32) -> i32
     bb1: {
         _0 = copy x;
         storage_dead(_4);
-        storage_dead(y);
-        storage_dead(x);
-        storage_dead(b);
         return;
     }
 
     bb2: {
         _0 = copy y;
         storage_dead(_4);
-        storage_dead(y);
-        storage_dead(x);
-        storage_dead(b);
         return;
     }
 }

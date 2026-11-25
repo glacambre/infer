@@ -17,10 +17,8 @@ use std::mem;
 use derive_generic_visitor::Visitor;
 use index_vec::Idx;
 
-use crate::ast::types_utils::TyVisitable;
 use crate::ast::visitor::{VisitWithBinderDepth, VisitorWithBinderDepth};
 use crate::formatter::IntoFormatter;
-use crate::ids::IndexVec;
 use crate::options::MonomorphizeMut;
 use crate::pretty::FmtWithCtx;
 use crate::register_error;
@@ -337,8 +335,8 @@ impl<'a> PartialMonomorphizer<'a> {
             | TyKind::Array(ty, _)
             | TyKind::Pattern(ty, _)
             | TyKind::Slice(ty) => self.is_infected(ty),
-            TyKind::Adt(tref) => match tref.id {
-                TypeId::Adt(id) => {
+            TyKind::Adt(tref) => match tref.as_adt() {
+                Some(id) => {
                     let ty_infected = self.infected_types.contains(&id);
                     let args_infected = if self.specialize_adts {
                         // Since we make sure to only call the method on a processed type, any type
@@ -351,7 +349,7 @@ impl<'a> PartialMonomorphizer<'a> {
                     };
                     ty_infected || args_infected
                 }
-                TypeId::Tuple | TypeId::Builtin(_) => {
+                None => {
                     // Builtin types have no declaration to specialize, so infected arguments stay
                     // visible inside them.
                     tref.generics.types.iter().any(|ty| self.is_infected(ty))
@@ -499,7 +497,7 @@ impl VisitAstMut for PartialMonomorphizer<'_> {
 
     fn exit_type_decl_ref(&mut self, x: &mut TypeDeclRef) {
         if self.specialize_adts
-            && let TypeId::Adt(id) = x.id
+            && let Some(id) = x.as_adt()
             && let Some(new_decl_ref) = self.process_generics(id.into(), &x.generics)
         {
             *x = new_decl_ref.try_into().unwrap()

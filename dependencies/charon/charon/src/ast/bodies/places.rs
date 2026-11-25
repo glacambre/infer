@@ -1,5 +1,90 @@
-//! This file groups everything which is linked to implementations about [crate::expressions]
+//! Implements expressions: paths, operands, rvalues, lvalues
 use crate::ast::*;
+use derive_generic_visitor::{Drive, DriveMut, DriveTwo};
+use macros::{EnumAsGetters, EnumIsA, EnumToGetters, VariantName};
+use serde_state::{DeserializeState, SerializeState};
+
+#[derive(
+    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
+)]
+#[serde_state(state_implements = HashConsSerializerState)] // Avoid corecursive impls due to perfect derive
+pub struct Place {
+    pub kind: PlaceKind,
+    pub ty: Ty,
+}
+
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    EnumIsA,
+    EnumAsGetters,
+    EnumToGetters,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
+#[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Place"))]
+pub enum PlaceKind {
+    /// A local variable in a function body.
+    Local(LocalId),
+    /// A subplace of a place.
+    Projection(Box<Place>, ProjectionElem),
+    /// A global (const or static).
+    /// Not present in MIR; introduced in [simplify_constants.rs].
+    Global(GlobalDeclRef),
+}
+
+/// Projects a place to a subplace.
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    EnumIsA,
+    EnumAsGetters,
+    EnumToGetters,
+    VariantName,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
+pub enum ProjectionElem {
+    /// Dereference a shared/mutable reference, a box, or a raw pointer.
+    Deref,
+    /// Project to the field of an ADT (struct, union, or enum).
+    Field(Option<VariantId>, FieldId),
+    /// A built-in pointer (a reference, raw pointer, or `Box`) in Rust is always a fat pointer: it
+    /// contains an address and metadata for the pointed-to place. This metadata is empty for sized
+    /// types, it's the length for slices, and the vtable for `dyn Trait`.
+    ///
+    /// We consider such pointers to be like a struct with two fields; this represent access to the
+    /// metadata "field".
+    PtrMetadata,
+    /// MIR imposes that the argument to an index projection be a local variable, meaning
+    /// that even constant indices into arrays are let-bound as separate variables.
+    /// We **eliminate** this variant in a micro-pass for LLBC.
+    #[cfg_attr(feature = "charon_on_charon", charon::rename("ProjIndex"))]
+    Index {
+        offset: Box<Operand>,
+        #[drive(skip)]
+        from_end: bool,
+    },
+    /// Take a subslice of a slice or array. If `from_end` is `true` this is
+    /// `slice[from..slice.len() - to]`, otherwise this is `slice[from..to]`.
+    /// We **eliminate** this variant in a micro-pass for LLBC.
+    Subslice {
+        from: Box<Operand>,
+        to: Box<Operand>,
+        #[drive(skip)]
+        from_end: bool,
+    },
+}
 
 impl Place {
     pub fn new(local_id: LocalId, ty: Ty) -> Place {
@@ -65,9 +150,7 @@ impl Place {
         use TyKind::*;
         let proj_ty = match self.ty.kind() {
             Ref(_, ty, _) | RawPtr(ty, _) => ty.clone(),
-            Adt(tref) if matches!(tref.id, TypeId::Builtin(BuiltinTy::Box)) => {
-                tref.generics.types[0].clone()
-            }
+            Adt(tref) if tref.is_box() => tref.generics.types[0].clone(),
             Adt(..) | TypeVar(_) | Literal(_) | Never | TraitType(..) | DynTrait(..)
             | FnPtr(..) | FnDef(..) | PtrMetadata(..) | Array(..) | Slice(_) | Pattern(..)
             | Error(..) => {
@@ -90,75 +173,6 @@ impl Place {
     }
 }
 
-impl ConstantExpr {
-    pub fn mk_unit() -> Self {
-        ConstantExpr {
-            kind: ConstantExprKind::Adt(None, Vec::new()),
-            ty: Ty::mk_unit(),
-        }
-    }
-
-    pub fn mk_usize(scalar: ScalarValue) -> Self {
-        ConstantExpr {
-            kind: ConstantExprKind::Literal(Literal::Scalar(scalar)),
-            ty: Ty::mk_usize(),
-        }
-    }
-}
-
-impl Operand {
-    pub fn mk_const_unit() -> Self {
-        Operand::Const(Box::new(ConstantExpr::mk_unit()))
-    }
-
-    pub fn ty(&self) -> &Ty {
-        match self {
-            Operand::Copy(place) | Operand::Move(place) => place.ty(),
-            Operand::Const(constant_expr) => &constant_expr.ty,
-        }
-    }
-}
-
-impl Rvalue {
-    pub fn unit_value() -> Self {
-        Rvalue::Aggregate(
-            AggregateKind::Adt(
-                TypeDeclRef {
-                    id: TypeId::Tuple,
-                    generics: Box::new(GenericArgs::empty()),
-                },
-                None,
-                None,
-            ),
-            Vec::new(),
-        )
-    }
-}
-
-impl BorrowKind {
-    pub fn mutable(x: bool) -> Self {
-        if x { Self::Mut } else { Self::Shared }
-    }
-}
-
-impl From<BorrowKind> for RefKind {
-    fn from(value: BorrowKind) -> Self {
-        match value {
-            BorrowKind::Shared | BorrowKind::Shallow => RefKind::Shared,
-            BorrowKind::Mut | BorrowKind::TwoPhaseMut | BorrowKind::UniqueImmutable => RefKind::Mut,
-        }
-    }
-}
-
-impl From<RefKind> for BorrowKind {
-    fn from(value: RefKind) -> Self {
-        match value {
-            RefKind::Shared => BorrowKind::Shared,
-            RefKind::Mut => BorrowKind::Mut,
-        }
-    }
-}
-
 impl ProjectionElem {
     /// Compute the type obtained when applying the current projection to a place of type `ty`.
     pub fn project_type(&self, krate: &TranslatedCrate, ty: &Ty) -> Option<Ty> {
@@ -168,9 +182,7 @@ impl ProjectionElem {
                 use TyKind::*;
                 match ty.kind() {
                     Ref(_, ty, _) | RawPtr(ty, _) => ty.clone(),
-                    Adt(tref) if matches!(tref.id, TypeId::Builtin(BuiltinTy::Box)) => {
-                        tref.generics.types[0].clone()
-                    }
+                    Adt(tref) if tref.is_box() => tref.generics.types[0].clone(),
                     Adt(..) | TypeVar(_) | Literal(_) | Never | TraitType(..) | DynTrait(..)
                     | Array(..) | Slice(..) | FnPtr(..) | FnDef(..) | PtrMetadata(..)
                     | Pattern(..) | Error(..) => {
@@ -179,15 +191,12 @@ impl ProjectionElem {
                     }
                 }
             }
-            Field(pkind, field_id) => {
-                // Lookup the type decl
-                use FieldProjKind::*;
-                match pkind {
-                    Adt(type_decl_id, variant_id) => {
+            Field(variant_id, field_id) => {
+                let tref = ty.as_adt()?;
+                match tref.as_builtin() {
+                    None => {
                         // Can fail if the type declaration was not translated.
-                        let type_decl = krate.type_decls.get(*type_decl_id)?;
-                        let tref = ty.as_adt()?;
-                        assert!(TypeId::Adt(*type_decl_id) == tref.id);
+                        let type_decl = krate.type_decls.get(tref.adt_id())?;
                         use TypeDeclKind::*;
                         match &type_decl.kind {
                             Struct(fields) | Union(fields) => {
@@ -209,71 +218,16 @@ impl ProjectionElem {
                             Opaque | Alias(_) | Error(_) => return None,
                         }
                     }
-                    Tuple(_) => ty
-                        .as_tuple()?
+                    Some(BuiltinTy::Tuple) => tref
+                        .generics
+                        .types
                         .get(TypeVarId::from(usize::from(*field_id)))?
                         .clone(),
+                    Some(_) => return None,
                 }
             }
             PtrMetadata => ty.get_ptr_metadata(krate).into_type(),
             Index { .. } | Subslice { .. } => ty.as_array_or_slice()?.clone(),
         })
-    }
-}
-
-impl BinOp {
-    pub fn with_overflow(&self, overflow: OverflowMode) -> Self {
-        match self {
-            BinOp::Add(_) | BinOp::AddChecked => BinOp::Add(overflow),
-            BinOp::Sub(_) | BinOp::SubChecked => BinOp::Sub(overflow),
-            BinOp::Mul(_) | BinOp::MulChecked => BinOp::Mul(overflow),
-            BinOp::Div(_) => BinOp::Div(overflow),
-            BinOp::Rem(_) => BinOp::Rem(overflow),
-            BinOp::Shl(_) => BinOp::Shl(overflow),
-            BinOp::Shr(_) => BinOp::Shr(overflow),
-            _ => {
-                panic!(
-                    "Cannot set overflow mode for this binary operator: {:?}",
-                    self
-                );
-            }
-        }
-    }
-}
-
-impl UnOp {
-    pub fn with_overflow(&self, overflow: OverflowMode) -> Self {
-        match self {
-            UnOp::Neg(_) => UnOp::Neg(overflow),
-            _ => {
-                panic!(
-                    "Cannot set overflow mode for this unary operator: {:?}",
-                    self
-                );
-            }
-        }
-    }
-}
-
-impl FnPtr {
-    pub fn new(kind: FnPtrKind, generics: impl Into<BoxedArgs>) -> Self {
-        Self {
-            kind: Box::new(kind),
-            generics: generics.into(),
-        }
-    }
-
-    /// Get the generics for the pre-monomorphization item.
-    pub fn pre_mono_generics<'a>(&'a self, krate: &'a TranslatedCrate) -> &'a GenericArgs {
-        match *self.kind {
-            FnPtrKind::Fun(FunId::Regular(fun_id)) => krate
-                .item_name(fun_id)
-                .mono_args()
-                .unwrap_or(&self.generics),
-            //  We don't mono builtins.
-            FnPtrKind::Fun(FunId::Builtin(..)) => &self.generics,
-            // Can't happen in mono mode.
-            FnPtrKind::Trait(..) => &self.generics,
-        }
     }
 }

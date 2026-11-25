@@ -31,8 +31,6 @@ fn succ(i: i32) -> i32
         _3 = copy _2 panic.+ const 1i32;
         _0 = move _3;
         storage_dead(_2);
-        storage_dead(_3);
-        storage_dead(i);
         return;
     }
 }
@@ -60,6 +58,7 @@ fn Y() -> i32
 const Y: i32 = Y()
 
 // Full name: global_place::main
+#[allow(unused)]
 fn main()
 {
     let _0: (); // return
@@ -75,7 +74,6 @@ fn main()
         eleven = move _2;
         _0 = ();
         storage_dead(eleven);
-        storage_dead(_2);
         return;
     }
 }

@@ -1,6 +1,7 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
+#[fundamental]
 #[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
@@ -17,6 +18,7 @@ pub trait Index<Self, Idx>
 }
 
 // Full name: core::marker::Sized
+#[fundamental]
 #[lang_item(Sized)]
 pub trait Sized<Self>
 {
@@ -35,6 +37,7 @@ where
     TypeOutlives2: I: '_0,
 = <opaque>
 
+#[track_caller]
 fn core::slice::index::slice_index_fail::do_panic::runtime(start: usize, len: usize) -> !
 {
     let _0: !; // return
@@ -75,7 +78,7 @@ fn core::slice::index::slice_index_fail::do_panic::runtime(start: usize, len: us
     storage_live(_9)
     _16 = copy args_4.0
     _9 = &(*_16)
-    _8 = new_display<'28, '30, usize>[{built_in impl Sized for usize}, {impl#4}](move _9)
+    _8 = new_display<'28, '30, usize>[{built_in impl Sized for usize}, {impl#3}](move _9)
     ↳⚡ storage_dead(_17)
         storage_dead(_16)
         storage_dead(args_7)
@@ -89,7 +92,7 @@ fn core::slice::index::slice_index_fail::do_panic::runtime(start: usize, len: us
     storage_live(_11)
     _17 = copy args_4.1
     _11 = &(*_17)
-    _10 = new_display<'32, '34, usize>[{built_in impl Sized for usize}, {impl#4}](move _11)
+    _10 = new_display<'32, '34, usize>[{built_in impl Sized for usize}, {impl#3}](move _11)
     ↳⚡ storage_dead(_17)
         storage_dead(_16)
         storage_dead(args_7)
@@ -139,6 +142,7 @@ fn core::slice::index::slice_index_fail::do_panic::runtime(start: usize, len: us
     panic(core::panicking::panic_fmt)
 }
 
+#[track_caller]
 fn core::slice::index::slice_index_fail::do_panic#1::runtime(end: usize, len: usize) -> !
 {
     let _0: !; // return
@@ -179,7 +183,7 @@ fn core::slice::index::slice_index_fail::do_panic#1::runtime(end: usize, len: us
     storage_live(_9)
     _16 = copy args_4.0
     _9 = &(*_16)
-    _8 = new_display<'28, '30, usize>[{built_in impl Sized for usize}, {impl#4}](move _9)
+    _8 = new_display<'28, '30, usize>[{built_in impl Sized for usize}, {impl#3}](move _9)
     ↳⚡ storage_dead(_17)
         storage_dead(_16)
         storage_dead(args_7)
@@ -193,7 +197,7 @@ fn core::slice::index::slice_index_fail::do_panic#1::runtime(end: usize, len: us
     storage_live(_11)
     _17 = copy args_4.1
     _11 = &(*_17)
-    _10 = new_display<'32, '34, usize>[{built_in impl Sized for usize}, {impl#4}](move _11)
+    _10 = new_display<'32, '34, usize>[{built_in impl Sized for usize}, {impl#3}](move _11)
     ↳⚡ storage_dead(_17)
         storage_dead(_16)
         storage_dead(args_7)
@@ -243,6 +247,7 @@ fn core::slice::index::slice_index_fail::do_panic#1::runtime(end: usize, len: us
     panic(core::panicking::panic_fmt)
 }
 
+#[track_caller]
 fn core::slice::index::slice_index_fail::do_panic#2::runtime(start: usize, end: usize) -> !
 {
     let _0: !; // return
@@ -283,7 +288,7 @@ fn core::slice::index::slice_index_fail::do_panic#2::runtime(start: usize, end: 
     storage_live(_9)
     _16 = copy args_4.0
     _9 = &(*_16)
-    _8 = new_display<'28, '30, usize>[{built_in impl Sized for usize}, {impl#4}](move _9)
+    _8 = new_display<'28, '30, usize>[{built_in impl Sized for usize}, {impl#3}](move _9)
     ↳⚡ storage_dead(_17)
         storage_dead(_16)
         storage_dead(args_7)
@@ -297,7 +302,7 @@ fn core::slice::index::slice_index_fail::do_panic#2::runtime(start: usize, end: 
     storage_live(_11)
     _17 = copy args_4.1
     _11 = &(*_17)
-    _10 = new_display<'32, '34, usize>[{built_in impl Sized for usize}, {impl#4}](move _11)
+    _10 = new_display<'32, '34, usize>[{built_in impl Sized for usize}, {impl#3}](move _11)
     ↳⚡ storage_dead(_17)
         storage_dead(_16)
         storage_dead(args_7)
@@ -347,6 +352,7 @@ fn core::slice::index::slice_index_fail::do_panic#2::runtime(start: usize, end: 
     panic(core::panicking::panic_fmt)
 }
 
+#[track_caller]
 fn core::slice::index::slice_index_fail::do_panic#3::runtime(end: usize, len: usize) -> !
 {
     let _0: !; // return
@@ -387,7 +393,7 @@ fn core::slice::index::slice_index_fail::do_panic#3::runtime(end: usize, len: us
     storage_live(_9)
     _16 = copy args_4.0
     _9 = &(*_16)
-    _8 = new_display<'28, '30, usize>[{built_in impl Sized for usize}, {impl#4}](move _9)
+    _8 = new_display<'28, '30, usize>[{built_in impl Sized for usize}, {impl#3}](move _9)
     ↳⚡ storage_dead(_17)
         storage_dead(_16)
         storage_dead(args_7)
@@ -401,7 +407,7 @@ fn core::slice::index::slice_index_fail::do_panic#3::runtime(end: usize, len: us
     storage_live(_11)
     _17 = copy args_4.1
     _11 = &(*_17)
-    _10 = new_display<'32, '34, usize>[{built_in impl Sized for usize}, {impl#4}](move _11)
+    _10 = new_display<'32, '34, usize>[{built_in impl Sized for usize}, {impl#3}](move _11)
     ↳⚡ storage_dead(_17)
         storage_dead(_16)
         storage_dead(args_7)
@@ -476,6 +482,7 @@ where
   end: Idx,
 }
 
+#[track_caller]
 fn core::slice::index::slice_index_fail::do_panic(start: usize, len: usize) -> !
 {
     let _0: !; // return
@@ -501,6 +508,7 @@ fn core::slice::index::slice_index_fail::do_panic(start: usize, len: usize) -> !
         unwind_continue
 }
 
+#[track_caller]
 fn core::slice::index::slice_index_fail::do_panic#1(end: usize, len: usize) -> !
 {
     let _0: !; // return
@@ -526,6 +534,7 @@ fn core::slice::index::slice_index_fail::do_panic#1(end: usize, len: usize) -> !
         unwind_continue
 }
 
+#[track_caller]
 fn core::slice::index::slice_index_fail::do_panic#2(start: usize, end: usize) -> !
 {
     let _0: !; // return
@@ -551,6 +560,7 @@ fn core::slice::index::slice_index_fail::do_panic#2(start: usize, end: usize) ->
         unwind_continue
 }
 
+#[track_caller]
 fn core::slice::index::slice_index_fail::do_panic#3(end: usize, len: usize) -> !
 {
     let _0: !; // return
@@ -577,6 +587,7 @@ fn core::slice::index::slice_index_fail::do_panic#3(end: usize, len: usize) -> !
 }
 
 // Full name: core::panicking::panic_nounwind_fmt
+#[track_caller]
 pub fn panic_nounwind_fmt<'_0>(_1: Arguments<'_0>, _2: bool) -> !
 = <opaque>
 
@@ -590,21 +601,13 @@ where
     TraitClause0: (T: Sized),
 = <opaque>
 
-// Full name: core::slice::index::private_slice_index::Sealed
-pub trait Sealed<Self>
-{
-    proof ImpliedClause0: (Self: MetaSized)
-    vtable: core::slice::index::private_slice_index::Sealed::{vtable}
-}
-
 // Full name: core::slice::index::SliceIndex
 #[diagnostic_item("SliceIndex")]
 pub trait SliceIndex<Self, T>
 {
     proof ImpliedClause0: (Self: MetaSized)
-    proof ImpliedClause1: (Self: Sealed)
-    proof ImpliedClause2: (T: MetaSized)
-    proof ImpliedClause3: (Self::Output: MetaSized)
+    proof ImpliedClause1: (T: MetaSized)
+    proof ImpliedClause2: (Self::Output: MetaSized)
     type Output
     fn get<'_0_1>;
     fn get_mut<'_0_1>;
@@ -660,13 +663,14 @@ where
 {
     proof ImpliedClause0: ([T]: MetaSized) = {built_in impl MetaSized for [T]}
     proof ImpliedClause1: (I: MetaSized) = TraitClause1::ImpliedClause0
-    proof ImpliedClause2: (TraitClause2::Output: MetaSized) = TraitClause2::ImpliedClause3
+    proof ImpliedClause2: (TraitClause2::Output: MetaSized) = TraitClause2::ImpliedClause2
     type Output = TraitClause2::Output
     fn index<'_0_1> = impl_Index_for_slice::index<'_0_1, T, I>[TraitClause0, TraitClause1, TraitClause2]
     vtable: impl_Index_for_slice::{vtable}<T, I>[TraitClause0, TraitClause1, TraitClause2]
 }
 
 // Full name: core::slice::index::slice_index_fail
+#[track_caller]
 fn slice_index_fail(start: usize, end: usize, len: usize) -> !
 {
     let _0: !; // return
@@ -922,12 +926,6 @@ where
     storage_dead(offset)
     storage_dead(ptr_1)
     return
-}
-
-// Full name: core::slice::index::private_slice_index::{impl Sealed for Range<usize>[{built_in impl Sized for usize}]}
-impl "impl_Sealed_for_Range_usize" Sealed for Range<usize>[{built_in impl Sized for usize}] {
-    proof ImpliedClause0: (Range<usize>[{built_in impl Sized for usize}]: MetaSized) = {built_in impl MetaSized for Range<usize>[{built_in impl Sized for usize}]}
-    vtable: impl_Sealed_for_Range_usize::{vtable}
 }
 
 #[lang_item(SliceLen)]
@@ -1228,6 +1226,7 @@ where
 }
 
 // Full name: core::slice::index::{impl SliceIndex<[T]> for Range<usize>[{built_in impl Sized for usize}]}::get_unchecked_mut::precondition_check
+#[track_caller]
 fn impl_SliceIndex_slice_for_Range_usize::get_unchecked_mut::precondition_check(start: usize, end: usize, len: usize)
 {
     let _0: (); // return
@@ -1303,6 +1302,7 @@ fn impl_SliceIndex_slice_for_Range_usize::get_unchecked_mut::precondition_check(
 }
 
 // Full name: core::slice::index::{impl SliceIndex<[T]> for Range<usize>[{built_in impl Sized for usize}]}::get_unchecked_mut
+#[track_caller]
 pub unsafe fn get_unchecked_mut<T>(self: Range<usize>[{built_in impl Sized for usize}], slice: *mut [T]) -> *mut [T]
 where
     TraitClause0: (T: Sized),
@@ -1383,6 +1383,7 @@ where
 }
 
 // Full name: core::slice::index::{impl SliceIndex<[T]> for Range<usize>[{built_in impl Sized for usize}]}::get_unchecked::precondition_check
+#[track_caller]
 fn impl_SliceIndex_slice_for_Range_usize::get_unchecked::precondition_check(start: usize, end: usize, len: usize)
 {
     let _0: (); // return
@@ -1458,6 +1459,7 @@ fn impl_SliceIndex_slice_for_Range_usize::get_unchecked::precondition_check(star
 }
 
 // Full name: core::slice::index::{impl SliceIndex<[T]> for Range<usize>[{built_in impl Sized for usize}]}::get_unchecked
+#[track_caller]
 pub unsafe fn get_unchecked<T>(self: Range<usize>[{built_in impl Sized for usize}], slice: *const [T]) -> *const [T]
 where
     TraitClause0: (T: Sized),
@@ -1743,9 +1745,8 @@ where
     TraitClause0: (T: Sized),
 {
     proof ImpliedClause0: (Range<usize>[{built_in impl Sized for usize}]: MetaSized) = {built_in impl MetaSized for Range<usize>[{built_in impl Sized for usize}]}
-    proof ImpliedClause1: (Range<usize>[{built_in impl Sized for usize}]: Sealed) = impl_Sealed_for_Range_usize
+    proof ImpliedClause1: ([T]: MetaSized) = {built_in impl MetaSized for [T]}
     proof ImpliedClause2: ([T]: MetaSized) = {built_in impl MetaSized for [T]}
-    proof ImpliedClause3: ([T]: MetaSized) = {built_in impl MetaSized for [T]}
     type Output = [T]
     fn get<'_0_1> = get<'_0_1, T>[TraitClause0]
     fn get_mut<'_0_1> = get_mut<'_0_1, T>[TraitClause0]

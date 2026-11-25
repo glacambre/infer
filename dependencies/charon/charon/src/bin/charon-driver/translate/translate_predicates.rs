@@ -53,6 +53,7 @@ impl<'tcx> TranslateCtx<'tcx> {
                     SolverTraitLangItem::Sized => BuiltinImplData::Sized,
                     SolverTraitLangItem::TransmuteTrait => BuiltinImplData::Transmute,
                     SolverTraitLangItem::TrivialClone => BuiltinImplData::Auto,
+                    SolverTraitLangItem::TryAsDyn => BuiltinImplData::TryAsDynCompatible,
                     SolverTraitLangItem::Tuple => BuiltinImplData::Tuple,
                     SolverTraitLangItem::Unpin => BuiltinImplData::Auto,
                     SolverTraitLangItem::Unsize => BuiltinImplData::Unsize,
@@ -286,7 +287,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         let kind = match &impl_source.kind {
             TraitProofKind::Concrete(item) => {
                 let impl_ref =
-                    self.translate_trait_impl_ref(span, item, TraitImplSource::Normal)?;
+                    self.translate_trait_impl_ref(span, item, TransImplSource::Normal)?;
                 TraitRefKind::TraitImpl(impl_ref)
             }
             TraitProofKind::SelfProof => TraitRefKind::SelfId,
@@ -329,7 +330,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                     let mut impl_ref: TraitImplRef = self.translate_item(
                         span,
                         &tref.hax_skip_binder_ref().erase(self.hax_state_with_id()),
-                        TransItemSourceKind::TraitImpl(TraitImplSource::TraitAlias),
+                        TransItemSourceKind::TraitImpl(TransImplSource::TraitAlias),
                     )?;
                     assert!(
                         impl_ref.generics.trait_refs.is_empty(),
@@ -352,7 +353,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                     TraitRefKind::TraitImpl(self.translate_trait_impl_ref(
                         span,
                         item,
-                        TraitImplSource::ImplicitDestruct,
+                        TransImplSource::ImplicitDestruct,
                     )?)
                 } else {
                     let Some(builtin_data) = self.recognize_builtin_impl(trait_data, &trait_def)

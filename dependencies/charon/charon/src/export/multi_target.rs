@@ -311,7 +311,6 @@ impl TargetGroup {
             generics: canonical.generics.clone(),
             signature: canonical.signature.clone(),
             src: canonical.src.clone(),
-            is_global_initializer: canonical.is_global_initializer,
             body: Body::TargetDispatch(dispatch_map),
         }
     }
@@ -489,7 +488,7 @@ impl<'a> ItemDeduplicator<'a> {
                     for &id in group.ids.values() {
                         let fun_id = *id.as_fun().unwrap();
                         if let Some(fun_decl) = self.krate.fun_decls.get_mut(fun_id) {
-                            fun_decl.src = ItemSource::TargetDependent {
+                            fun_decl.src = FunSource::TargetDependent {
                                 dispatcher: FunDeclRef {
                                     id: facade_id,
                                     generics: Box::new(fun_decl.generics.identity_args()),
@@ -615,31 +614,24 @@ fn remove_unmentioned_methods(krate: &mut TranslatedCrate) {
             let fun_node = Fun(fun_id);
             graph.add_node(fun_node);
 
-            if let ItemSource::TraitDecl {
+            if let FunSource::TraitDefault {
                 trait_ref, item_id, ..
             }
-            | ItemSource::TraitImpl {
+            | FunSource::TraitImpl {
                 trait_ref, item_id, ..
             } = &fun.src
-                && let Some(&method_id) = item_id.as_method()
             {
-                let method_key = (trait_ref.id, method_id);
+                let method_key = (trait_ref.id, *item_id);
                 // The method node is reachable iff any of the corresponding function nodes is.
                 graph.add_edge(Method(method_key), fun_node, ());
                 graph.add_edge(fun_node, Method(method_key), ());
             }
 
             match &fun.src {
-                ItemSource::TraitDecl {
-                    item_id: AssocItemId::Method(_),
-                    ..
-                }
-                | ItemSource::TraitImpl {
-                    item_id: AssocItemId::Method(_),
-                    ..
-                }
-                | ItemSource::Spec { .. }
-                | ItemSource::TargetDependent { .. } => {}
+                FunSource::TraitDefault { .. }
+                | FunSource::TraitImpl { .. }
+                | FunSource::Spec { .. }
+                | FunSource::TargetDependent { .. } => {}
                 // Functions that aren't any of the above are reachable. target-dependent functions
                 // will be reachable if their dispatcher is.
                 _ => {
@@ -783,7 +775,7 @@ impl<'a> IdRefMapperVisitor<'a> {
 
 impl VisitAstMut for IdRefMapperVisitor<'_> {
     fn enter_type_decl_ref(&mut self, x: &mut TypeDeclRef) {
-        if let TypeId::Adt(id) = &mut x.id {
+        if let Some(id) = x.as_adt_mut() {
             self.map(id);
         }
     }
@@ -800,21 +792,9 @@ impl VisitAstMut for IdRefMapperVisitor<'_> {
         self.map(&mut x.id);
     }
 
-    fn enter_projection_elem(&mut self, x: &mut ProjectionElem) {
-        if let ProjectionElem::Field(proj, _) = x
-            && let FieldProjKind::Adt(id, _) = proj
-        {
-            self.map(id);
-        }
-    }
     fn enter_fn_ptr(&mut self, x: &mut FnPtr) {
         if let FnPtrKind::Fun(FunId::Regular(id)) = x.kind.as_mut() {
             self.map(id)
-        }
-    }
-    fn enter_fun_decl(&mut self, x: &mut FunDecl) {
-        if let Some(id) = &mut x.is_global_initializer {
-            self.map(id);
         }
     }
     fn enter_impl_elem(&mut self, x: &mut ImplElem) {

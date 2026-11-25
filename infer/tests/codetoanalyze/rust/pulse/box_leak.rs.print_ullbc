@@ -20,7 +20,6 @@ where
     bb0: {
         storage_live(_0);
         _0 = ();
-        storage_dead(t);
         return;
     }
 }

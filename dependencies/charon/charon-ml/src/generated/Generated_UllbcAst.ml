@@ -6,17 +6,20 @@ open Generated_GAst
 open Identifiers
 module BlockId = IdGen ()
 
+(** A "basic block", which contains a linear sequence of statements, followed by
+    a terminator, which is where non-linear control-flow happens. *)
 type block = { statements : statement list; terminator : terminator }
+
 and block_id = (BlockId.id[@visitors.opaque])
 and blocks = block list
 
+(** A statement. *)
 and statement = {
   span : span;
   kind : statement_kind;
   comments_before : string list;  (** Comments that precede this statement. *)
 }
 
-(** A raw statement: a statement without meta data. *)
 and statement_kind =
   | Assign of place * rvalue
   | SetDiscriminant of place * variant_id
@@ -29,12 +32,11 @@ and statement_kind =
           [insert_storage_statements] that all other locals have a [StorageLive]
           associated with them. *)
   | StorageDead of local_id
-      (** Indicates that this local should be deallocated; if it is already
-          deallocated, this is a no-op. A local may not have a [StorageDead] in
-          the function's body, in which case it is implicitly deallocated at the
-          end of the function. The return local does not receive a
-          [StorageDead]. We ensure in the micro-pass [insert_storage_statements]
-          that all other locals have a [StorageDead] before function exits. *)
+      (** Deallocates the given local; if it is already deallocated, this is a
+          no-op. Not all local deallocations are explicit: if a non-return local
+          is still live at function end (return or unwind), it is implicitly
+          deallocated. If [--deallocate-all-locals] is set, all local
+          deallocations are made explicit. *)
   | PlaceMention of place
       (** A place is mentioned, but not accessed. The place itself must still be
           valid though, so this statement is not a no-op: it can trigger UB if
@@ -63,13 +65,14 @@ and switch =
           the otherwise block. Note that matches over enumerations are performed
           by switching over the discriminant, which is an integer. *)
 
+(** A terminator: instruction to execute at the end of a block, which may jump
+    to other blocks. *)
 and terminator = {
   span : span;
   kind : terminator_kind;
   comments_before : string list;  (** Comments that precede this terminator. *)
 }
 
-(** A raw terminator: a terminator without meta data. *)
 and terminator_kind =
   | Goto of block_id
       (** Fields:

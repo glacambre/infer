@@ -57,7 +57,7 @@ impl RustcDatatypes {
 
         let mut datatypes = RustcDatatypes::default();
         datatypes.insert(
-            "rustc_hir::attrs::data_structures::AttributeKind",
+            "rustc_attr_ir::data_structures::AttributeKind",
             Copy {
                 selected_variants: Some(&[
                     "AutomaticallyDerived",
@@ -73,8 +73,8 @@ impl RustcDatatypes {
                     "NonExhaustive",
                     "Optimize",
                     "RustcAlign",
-                    "RustcDiagnosticItem",
                     "RustcIntrinsic",
+                    "RustcTestEntrypointMarker",
                     "ShouldPanic",
                     "TargetFeature",
                     "TrackCaller",
@@ -82,7 +82,7 @@ impl RustcDatatypes {
             },
         );
         datatypes.insert(
-            "rustc_hir::lang_items::LangItem",
+            "rustc_attr_ir::lang_items::LangItem",
             Copy {
                 selected_variants: None,
             },

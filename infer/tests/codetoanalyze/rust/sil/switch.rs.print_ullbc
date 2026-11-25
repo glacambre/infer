@@ -32,9 +32,6 @@ fn get_value(t: Types) -> i32
 
     bb1: {
         _0 = const 0i32;
-        storage_dead(_8);
-        storage_dead(_2);
-        storage_dead(t);
         return;
     }
 
@@ -43,9 +40,6 @@ fn get_value(t: Types) -> i32
         v = copy (t as variant Types::Value)._0;
         _0 = copy v;
         storage_dead(v);
-        storage_dead(_8);
-        storage_dead(_2);
-        storage_dead(t);
         return;
     }
 
@@ -64,9 +58,6 @@ fn get_value(t: Types) -> i32
         storage_dead(_6);
         storage_dead(b);
         storage_dead(a);
-        storage_dead(_8);
-        storage_dead(_2);
-        storage_dead(t);
         return;
     }
 
@@ -75,9 +66,6 @@ fn get_value(t: Types) -> i32
         id = copy (t as variant Types::Named).id;
         _0 = copy id;
         storage_dead(id);
-        storage_dead(_8);
-        storage_dead(_2);
-        storage_dead(t);
         return;
     }
 

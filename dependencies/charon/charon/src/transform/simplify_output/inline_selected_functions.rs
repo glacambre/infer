@@ -10,7 +10,7 @@ pub struct Transform {
 
 impl Transform {
     pub fn new(ctx: &mut TransformCtx) -> CowBox<dyn UllbcPass> {
-        let panic_name = Name::from_path(builtins::EXPLICIT_PANIC_NAME);
+        let panic_name = Name::from_path(names::EXPLICIT_PANIC_NAME);
         let panic_terminator = TerminatorKind::Abort(AbortKind::Panic(Some(panic_name)));
 
         // Collect and remove the functions that we want to inline.
@@ -27,12 +27,16 @@ impl Transform {
                     };
                     // The `anon_consts_to_call` pass already transformed references to anon consts
                     // into calls to their initializers so we only have to inline these.
-                    let is_anon_const_initializer = decl
-                        .is_global_initializer
-                        .and_then(|gid| ctx.translated.global_decls.get(gid))
-                        .is_some_and(|gdecl| matches!(gdecl.global_kind, GlobalKind::AnonConst));
+                    let is_anon_const_initializer = if let FunSource::GlobalInitializer(global) =
+                        &decl.src
+                        && let Some(gdecl) = ctx.translated.global_decls.get(global.id)
+                    {
+                        matches!(gdecl.global_kind, GlobalKind::AnonConst)
+                    } else {
+                        false
+                    };
                     let is_vec_construction_fn = decl.item_meta.diagnostic_item.as_deref()
-                        == Some(builtins::BOX_ASSUME_INIT_INTO_VEC_UNSAFE);
+                        == Some(names::BOX_ASSUME_INIT_INTO_VEC_UNSAFE);
                     is_local_panic_fn
                         || (is_anon_const_initializer && !ctx.options.raw_consts)
                         || (is_vec_construction_fn && ctx.options.treat_box_as_builtin)

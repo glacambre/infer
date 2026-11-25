@@ -19,11 +19,7 @@ use rustc_span::{Symbol, sym};
 
 use super::translate_crate::*;
 use super::translate_ctx::*;
-use charon_lib::ast::ullbc_ast::StatementKind;
-use charon_lib::ast::ullbc_ast_utils::BodyBuilder;
-use charon_lib::ast::*;
 use charon_lib::formatter::{FmtCtx, IntoFormatter, compute_local_names};
-use charon_lib::ids::IndexMap;
 use charon_lib::name_matcher::NamePattern;
 use charon_lib::pretty::FmtWithCtx;
 use charon_lib::ullbc_ast::*;
@@ -293,11 +289,11 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
                 let mut field_path = vec![];
                 for &(trait_id, clause_id) in &clause_path {
                     if let Ok(ItemRef::TraitDecl(tdecl)) = self.get_or_translate(trait_id.into())
-                        && let &vtable_decl_id = tdecl.vtable.as_ref().unwrap().id.as_adt().unwrap()
+                        && let vtable_decl_id = tdecl.vtable.as_ref().unwrap().adt_id()
                         && let Ok(ItemRef::Type(vtable_decl)) =
                             self.get_or_translate(vtable_decl_id.into())
                     {
-                        let ItemSource::VTableTy { supertrait_map, .. } = &vtable_decl.src else {
+                        let TypeSource::VTable { supertrait_map, .. } = &vtable_decl.src else {
                             unreachable!()
                         };
                         field_path.push(supertrait_map[clause_id].unwrap());
@@ -417,7 +413,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
 
         if !self.monomorphize() {
             // Make `Box::write` available to a later construction pass.
-            let path = NamePattern::parse(builtins::BOX_WRITE).unwrap();
+            let path = NamePattern::parse(names::BOX_WRITE).unwrap();
             let box_write_def_id = self
                 .resolve_path(span, &path, true)?
                 .into_iter()
@@ -735,18 +731,10 @@ impl<'tcx> BlockTransCtx<'tcx, '_, '_, '_> {
                     let TyKind::Adt(type_ref) = ty.kind() else {
                         raise_error!(self, span, "field projection on unexpected type");
                     };
-                    match type_ref.id {
-                        TypeId::Adt(type_id) => ProjectionElem::Field(
-                            FieldProjKind::Adt(type_id, downcast.take()),
-                            field,
-                        ),
-                        TypeId::Tuple => ProjectionElem::Field(
-                            FieldProjKind::Tuple(type_ref.generics.types.len()),
-                            field,
-                        ),
-                        TypeId::Builtin(BuiltinTy::Box) if field == FieldId::ZERO => {
-                            ProjectionElem::Deref
-                        }
+                    match type_ref.as_builtin() {
+                        None => ProjectionElem::Field(downcast.take(), field),
+                        Some(BuiltinTy::Tuple) => ProjectionElem::Field(None, field),
+                        Some(BuiltinTy::Box) if field == FieldId::ZERO => ProjectionElem::Deref,
                         _ => raise_error!(self, span, "field projection on unexpected type"),
                     }
                 }
@@ -843,7 +831,7 @@ impl<'tcx> BlockTransCtx<'tcx, '_, '_, '_> {
                         self.translate_trait_proof(span, &proof)?,
                     ));
                 } else if let Some(outlives) = clause.as_type_outlives_clause() {
-                    let Some(ty::OutlivesPredicate(outlived_ty, region)) = outlives.no_bound_vars()
+                    let Some(ty::OutlivesClause(outlived_ty, region)) = outlives.no_bound_vars()
                     else {
                         raise_error!(self, span, "higher-ranked outlives user type bound")
                     };
@@ -985,24 +973,22 @@ impl<'tcx> BlockTransCtx<'tcx, '_, '_, '_> {
                             let variant = place_ty.variant_index;
                             let variant_id = variant.map(|id| self.translate_variant_id(id));
                             let generics = &tref.generics;
-                            match tref.id {
-                                TypeId::Adt(type_id) => {
+                            match tref.as_builtin() {
+                                None => {
                                     assert!(
                                         ((adt_def.is_struct() || adt_def.is_union())
                                             && variant.is_none())
                                             || (adt_def.is_enum() && variant.is_some())
                                     );
-                                    let field_proj = FieldProjKind::Adt(type_id, variant_id);
-                                    ProjectionElem::Field(field_proj, field_id)
+                                    ProjectionElem::Field(variant_id, field_id)
                                 }
-                                TypeId::Tuple => {
+                                Some(BuiltinTy::Tuple) => {
                                     assert!(generics.regions.is_empty());
                                     assert!(variant.is_none());
                                     assert!(generics.const_generics.is_empty());
-                                    let field_proj = FieldProjKind::Tuple(generics.types.len());
-                                    ProjectionElem::Field(field_proj, field_id)
+                                    ProjectionElem::Field(None, field_id)
                                 }
-                                TypeId::Builtin(BuiltinTy::Box) => {
+                                Some(BuiltinTy::Box) => {
                                     // Some sanity checks
                                     assert!(generics.regions.is_empty());
                                     assert!(generics.types.len() == 2);
@@ -1019,22 +1005,15 @@ impl<'tcx> BlockTransCtx<'tcx, '_, '_, '_> {
                                         )
                                     }
                                 }
-                                _ => {
+                                Some(_) => {
                                     raise_error!(self, span, "Unexpected field projection")
                                 }
                             }
                         }
-                        ty::Tuple(_types) => {
-                            let field_proj = FieldProjKind::Tuple(tref.generics.types.len());
-                            ProjectionElem::Field(field_proj, field_id)
-                        }
-                        // We get there when we access one of the fields of the the state
-                        // captured by a closure.
-                        ty::Closure(..) => {
-                            let type_id = *tref.id.as_adt().unwrap();
-                            let field_proj = FieldProjKind::Adt(type_id, None);
-                            ProjectionElem::Field(field_proj, field_id)
-                        }
+                        ty::Tuple(_types) => ProjectionElem::Field(None, field_id),
+                        // We get there when we access one of the fields of the state captured by a
+                        // closure.
+                        ty::Closure(..) => ProjectionElem::Field(None, field_id),
                         _ => panic!(),
                     }
                 }
@@ -1256,7 +1235,9 @@ impl<'tcx> BlockTransCtx<'tcx, '_, '_, '_> {
                         | ty::adjustment::PointerCoercion::ReifyFnPointer(_),
                         ..,
                     ) => CastKind::FnPtr(src_ty, tgt_ty),
-                    mir::CastKind::Transmute => CastKind::Transmute(src_ty, tgt_ty),
+                    mir::CastKind::Transmute | mir::CastKind::BoxDerefTransmute => {
+                        CastKind::Transmute(src_ty, tgt_ty)
+                    }
                     // TODO
                     mir::CastKind::Subtype => CastKind::Transmute(src_ty, tgt_ty),
                     mir::CastKind::PointerCoercion(ty::adjustment::PointerCoercion::Unsize, ..) => {
@@ -1337,7 +1318,10 @@ impl<'tcx> BlockTransCtx<'tcx, '_, '_, '_> {
                         ))
                     }
                     mir::AggregateKind::Tuple => {
-                        let tref = TypeDeclRef::new(TypeId::Tuple, GenericArgs::empty());
+                        let tref = TypeDeclRef::new(
+                            TypeId::Builtin(BuiltinTy::Tuple),
+                            GenericArgs::empty(),
+                        );
                         Ok(Rvalue::Aggregate(
                             AggregateKind::Adt(tref, None, None),
                             operands_t,
@@ -1762,6 +1746,7 @@ impl<'tcx> BlockTransCtx<'tcx, '_, '_, '_> {
             ty::TyKind::FnDef(def_id, generics) => {
                 // The type of the value is one of the singleton types that corresponds to each function,
                 // which is enough information.
+                let generics = generics.no_bound_vars().expect("bound variables in FnDef");
                 let item = &hax::translate_item_ref(&self.hax_state, *def_id, generics);
                 trace!("func: {:?}", item.def_id);
                 let fun_def = self.hax_def(item)?;
@@ -1898,6 +1883,9 @@ impl<'tcx> BlockTransCtx<'tcx, '_, '_, '_> {
             }
             mir::AssertKind::NullPointerDereference => {
                 Ok(BuiltinAssertKind::NullPointerDereference)
+            }
+            mir::AssertKind::NullReferenceConstructed => {
+                Ok(BuiltinAssertKind::NullReferenceCreated)
             }
             mir::AssertKind::InvalidEnumConstruction(operand) => {
                 let operand = self.translate_operand(span, operand)?;

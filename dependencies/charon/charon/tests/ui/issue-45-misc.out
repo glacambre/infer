@@ -1,10 +1,12 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
+#[fundamental]
 #[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Tuple
+#[fundamental]
 #[lang_item(Tuple)]
 pub trait Tuple<Self>
 {
@@ -13,6 +15,7 @@ pub trait Tuple<Self>
 }
 
 // Full name: core::marker::Sized
+#[fundamental]
 #[lang_item(Sized)]
 pub trait Sized<Self>
 {
@@ -21,6 +24,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::ops::function::FnOnce
+#[fundamental]
 #[lang_item(FnOnce)]
 pub trait FnOnce<Self, Args>
 {
@@ -34,6 +38,7 @@ pub trait FnOnce<Self, Args>
 }
 
 // Full name: core::ops::function::FnMut
+#[fundamental]
 #[lang_item(FnMut)]
 pub trait FnMut<Self, Args>
 {
@@ -154,9 +159,19 @@ pub trait Step<Self>
     proof ImpliedClause2: (Self: PartialOrd<Self>)
     fn steps_between<'_0_1, '_1_1>;
     fn forward_checked;
+    fn forward_overflowing;
     fn backward_checked;
+    fn backward_overflowing;
     non-dyn-compatible
 }
+
+// Full name: core::iter::range::{impl Step for u8}::backward_overflowing
+pub fn backward_overflowing(_1: u8, _2: usize) -> (u8, bool)
+= <opaque>
+
+// Full name: core::iter::range::{impl Step for u8}::forward_overflowing
+pub fn forward_overflowing(_1: u8, _2: usize) -> (u8, bool)
+= <opaque>
 
 // Full name: core::iter::range::{impl Step for u8}::backward_checked
 pub fn backward_checked(_1: u8, _2: usize) -> Option<u8>[{built_in impl Sized for u8}]
@@ -177,7 +192,9 @@ impl "impl_Step_for_u8" Step for u8 {
     proof ImpliedClause2: (u8: PartialOrd<u8>) = impl_PartialOrd_u8_for_u8
     fn steps_between<'_0_1, '_1_1> = steps_between<'_0_1, '_1_1>
     fn forward_checked = forward_checked
+    fn forward_overflowing = forward_overflowing
     fn backward_checked = backward_checked
+    fn backward_overflowing = backward_overflowing
     non-dyn-compatible
 }
 

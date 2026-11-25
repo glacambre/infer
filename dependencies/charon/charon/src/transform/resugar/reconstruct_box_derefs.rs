@@ -4,19 +4,15 @@
 //! `--treat-box-as-builtin`, we convert these back to derefs on the box.
 use std::ops::ControlFlow;
 
-use derive_generic_visitor::*;
-
-use crate::ast::ullbc_ast_utils::StmtLoc;
-use crate::ast::*;
-use crate::ids::IndexVec;
 use crate::transform::TransformCtx;
 use crate::transform::ctx::UllbcPass;
-use crate::ullbc_ast::{ExprBody, StatementKind};
+use crate::ullbc_ast::*;
 
 pub struct Transform;
 
 /// Look for
 /// ```ignore
+/// transmute::<Unique<T>, *const T>(copy (*b))
 /// transmute::<NonNull<T>, *const T>(copy (*b).0)
 /// ```
 /// Returns `*b`
@@ -28,20 +24,20 @@ fn box_pointee_pointer_assignment(rvalue: &Rvalue) -> Option<Place> {
     else {
         return None;
     };
-    let (field_base, ProjectionElem::Field(_, FieldId::ZERO)) = hidden_pointer.as_projection()?
-    else {
+    let unique_place = match hidden_pointer.as_projection()? {
+        (field_base, ProjectionElem::Field(_, FieldId::ZERO)) => field_base,
+        _ => hidden_pointer,
+    };
+    let (box_place, ProjectionElem::Deref) = unique_place.as_projection()? else {
         return None;
     };
-    let (box_place, ProjectionElem::Deref) = field_base.as_projection()? else {
+    let TyKind::Adt(tref) = box_place.ty().kind() else {
         return None;
     };
-    let TyKind::Adt(TypeDeclRef {
-        id: TypeId::Builtin(BuiltinTy::Box),
-        generics: box_generics,
-    }) = box_place.ty().kind()
-    else {
+    if !tref.is_box() {
         return None;
-    };
+    }
+    let box_generics = &tref.generics;
     if &box_generics.types[0] != raw_ptr_ty.as_raw_ptr()?.0 {
         return None;
     }

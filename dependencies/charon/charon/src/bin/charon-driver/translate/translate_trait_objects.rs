@@ -1,6 +1,3 @@
-use crate::hax;
-use crate::hax::TraitPredicate;
-use charon_lib::ast::ullbc_ast_utils::BodyBuilder;
 use itertools::Itertools;
 use rustc_span::kw;
 use std::mem;
@@ -8,8 +5,9 @@ use std::mem;
 use super::{
     translate_crate::TransItemSourceKind, translate_ctx::*, translate_generics::BindingLevel,
 };
+use crate::hax;
+use crate::hax::TraitPredicate;
 use charon_lib::formatter::IntoFormatter;
-use charon_lib::ids::IndexVec;
 use charon_lib::pretty::FmtWithCtx;
 use charon_lib::ullbc_ast::*;
 
@@ -358,7 +356,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         assert!(
             tref.def_id
                 .as_real_def_id()
-                .is_some_and(|id| self.tcx.is_lang_item(id, rustc_hir::LangItem::Destruct)),
+                .is_some_and(|id| self.tcx.is_lang_item(id, rustc_attr_ir::LangItem::Destruct)),
             "unexpected non-dyn compatible supertrait: {:?}",
             tref.def_id
         );
@@ -598,7 +596,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             def_id: type_id,
             item_meta,
             generics,
-            src: ItemSource::VTableTy {
+            src: TypeSource::VTable {
                 dyn_predicate,
                 field_map,
                 supertrait_map,
@@ -698,7 +696,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         let vtable_ref: GlobalDeclRef = self.translate_item_maybe_enqueue(
             span,
             impl_ref,
-            TransItemSourceKind::VTableInstance(TraitImplSource::Normal),
+            TransItemSourceKind::VTableInstance(TransImplSource::Normal),
             enqueue,
         )?;
         Ok(Some(vtable_ref))
@@ -709,7 +707,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         &mut self,
         span: Span,
         impl_def: &hax::FullDef<'tcx>,
-        impl_kind: &TraitImplSource,
+        impl_kind: &TransImplSource,
     ) -> Result<(Option<TraitImplRef>, TypeDeclRef), Error> {
         let implemented_trait = match impl_def.kind() {
             hax::FullDefKind::TraitImpl { trait_pred, .. } => &trait_pred.trait_ref,
@@ -746,17 +744,13 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         global_id: GlobalDeclId,
         item_meta: ItemMeta,
         impl_def: &hax::FullDef<'tcx>,
-        impl_kind: &TraitImplSource,
+        impl_kind: &TransImplSource,
     ) -> Result<GlobalDecl, Error> {
         let span = item_meta.span;
 
-        let (src, vtable_struct_ref) =
-            match self.get_vtable_instance_info(span, impl_def, impl_kind)? {
-                (Some(impl_ref), vtable_struct_ref) => {
-                    (ItemSource::VTableInstance { impl_ref }, vtable_struct_ref)
-                }
-                (None, vtable_struct_ref) => (ItemSource::VTableInstanceMono, vtable_struct_ref),
-            };
+        let (impl_ref, vtable_struct_ref) =
+            self.get_vtable_instance_info(span, impl_def, impl_kind)?;
+        let src = GlobalSource::VTableInstance { impl_ref };
 
         // Initializer function for this global.
         let init = self.register_item(
@@ -909,7 +903,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         // Retrieve the expected field types from the struct definition. This avoids complicated
         // substitutions.
         let field_tys = {
-            let vtable_decl_id = *vtable_struct_ref.id.as_adt().unwrap();
+            let vtable_decl_id = vtable_struct_ref.adt_id();
             let ItemRef::Type(vtable_def) = self.t_ctx.get_or_translate(vtable_decl_id.into())?
             else {
                 unreachable!()
@@ -1079,23 +1073,21 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         init_func_id: FunDeclId,
         item_meta: ItemMeta,
         impl_def: &hax::FullDef<'tcx>,
-        impl_kind: &TraitImplSource,
+        impl_kind: &TransImplSource,
     ) -> Result<FunDecl, Error> {
         let span = item_meta.span;
 
-        let (src, vtable_struct_ref) =
-            match self.get_vtable_instance_info(span, impl_def, impl_kind)? {
-                (Some(impl_ref), vtable_struct_ref) => {
-                    (ItemSource::VTableInstance { impl_ref }, vtable_struct_ref)
-                }
-                (None, vtable_struct_ref) => (ItemSource::VTableInstanceMono, vtable_struct_ref),
-            };
+        let (_, vtable_struct_ref) = self.get_vtable_instance_info(span, impl_def, impl_kind)?;
 
         let init_for = self.register_item(
             span,
             impl_def.this(),
             TransItemSourceKind::VTableInstance(*impl_kind),
         );
+        let src = FunSource::GlobalInitializer(GlobalDeclRef {
+            id: init_for,
+            generics: Box::new(self.outermost_generics().identity_args()),
+        });
 
         // Signature: `() -> VTable`.
         let sig = FunSig {
@@ -1108,7 +1100,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
 
         let body = match impl_kind {
             _ if item_meta.opacity.with_private_contents().is_opaque() => Body::Opaque,
-            TraitImplSource::Normal => {
+            TransImplSource::Normal => {
                 self.gen_vtable_instance_init_body(span, impl_def, vtable_struct_ref)?
             }
             _ => {
@@ -1126,7 +1118,6 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             generics: self.into_generics(),
             signature: Box::new(sig),
             src,
-            is_global_initializer: Some(init_for),
             body,
         })
     }
@@ -1286,8 +1277,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             item_meta,
             generics: self.into_generics(),
             signature: Box::new(signature),
-            src: ItemSource::VTableMethodShim,
-            is_global_initializer: None,
+            src: FunSource::VTableShim,
             body,
         })
     }
@@ -1334,8 +1324,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             item_meta,
             generics: self.into_generics(),
             signature: Box::new(signature),
-            src: ItemSource::VTableMethodShim,
-            is_global_initializer: None,
+            src: FunSource::VTableShim,
             body,
         })
     }

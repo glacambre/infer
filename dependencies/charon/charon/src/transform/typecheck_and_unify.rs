@@ -505,11 +505,9 @@ impl VisitAstMut for TypeCheckVisitor<'_> {
 
     // Check that generics match the parameters of the target item.
     fn enter_type_decl_ref(&mut self, x: &mut TypeDeclRef) {
-        match x.id {
-            TypeId::Adt(id) => self.assert_matches_item(id, &mut x.generics),
-            // TODO: check builtin generics.
-            TypeId::Tuple => {}
-            TypeId::Builtin(_) => {}
+        // TODO: check builtin generics.
+        if let Some(id) = x.as_adt() {
+            self.assert_matches_item(id, &mut x.generics)
         }
     }
     fn enter_fun_decl_ref(&mut self, x: &mut FunDeclRef) {
@@ -652,7 +650,7 @@ impl TransformPass for Check {
             let accept_type_errors = matches!(
                 &item,
                 ItemRefMut::Fun(FunDecl {
-                    src: ItemSource::TraitImpl {
+                    src: FunSource::TraitImpl {
                         reuses_default: true,
                         ..
                     },
