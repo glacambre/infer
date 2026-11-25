@@ -107,7 +107,7 @@ let capture_file json_filename =
   let json = Yojson.Basic.from_file json_filename in
   let file_name = filename_from_json json in
   let textual =
-    match Charon.UllbcOfJson.crate_of_json json with
+    match Charon.OfJson.crate_of_json json with
     | Ok crate ->
         RustMir2Textual.mk_module crate ~file_name
     | Error err ->

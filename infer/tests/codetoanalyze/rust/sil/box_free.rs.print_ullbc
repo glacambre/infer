@@ -1,15 +1,57 @@
 # Final ULLBC before serialization:
 
+// Full name: core::marker::Destruct
+#[lang_item("destruct")]
+pub trait Destruct<Self>
+{
+    fn drop_in_place = core::marker::Destruct::drop_in_place<Self>
+    non-dyn-compatible
+}
+
+unsafe fn core::marker::Destruct::drop_in_place<Self>(_1: *mut Self)
+= <opaque>
+
 // Full name: core::ptr::non_null::NonNull
 #[lang_item("NonNull")]
 pub opaque type NonNull<T>
+where
+    [@TraitClause0]: Destruct<T>,
 
 // Full name: core::ptr::unique::Unique
 pub opaque type Unique<T>
+where
+    [@TraitClause0]: Destruct<T>,
 
 // Full name: alloc::alloc::Global
 #[lang_item("global_alloc_ty")]
 pub struct Global {}
+
+// Full name: alloc::alloc::Global::{impl Destruct for Global}::drop_in_place
+unsafe fn {impl Destruct for Global}::drop_in_place(_1: *mut Global)
+= <opaque>
+
+// Full name: alloc::alloc::Global::{impl Destruct for Global}
+impl Destruct for Global {
+    fn drop_in_place = {impl Destruct for Global}::drop_in_place
+    non-dyn-compatible
+}
+
+// Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop_in_place
+unsafe fn {impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop_in_place<T, A>(_1: *mut alloc::boxed::Box<T>[@TraitClause0, @TraitClause1])
+where
+    [@TraitClause0]: Destruct<T>,
+    [@TraitClause1]: Destruct<A>,
+= <opaque>
+
+// Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}
+impl<T, A> Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]
+where
+    [@TraitClause0]: Destruct<T>,
+    [@TraitClause1]: Destruct<A>,
+{
+    fn drop_in_place = {impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop_in_place<T, A>[@TraitClause0, @TraitClause1]
+    non-dyn-compatible
+}
 
 // Full name: UNIT_METADATA
 fn UNIT_METADATA()
@@ -30,7 +72,7 @@ fn main()
 {
     let _0: (); // return
     let ptr_1: *const i32; // local
-    let x_2: alloc::boxed::Box<i32>; // local
+    let x_2: alloc::boxed::Box<i32>[{built_in impl Destruct for i32}, {impl Destruct for Global}]; // local
     let _3: *const i32; // anonymous local
     let _4: &'1 i32; // anonymous local
     let ub_5: i32; // local
@@ -41,7 +83,7 @@ fn main()
         _0 = ();
         storage_live(ptr_1);
         storage_live(x_2);
-        x_2 = @BoxNew<i32>(const 50 : i32) -> bb2 (unwind: bb1);
+        x_2 = @BoxNew<i32>[{built_in impl Destruct for i32}](const 50 : i32) -> bb2 (unwind: bb1);
     }
 
     bb1: {
@@ -51,14 +93,14 @@ fn main()
     bb2: {
         storage_live(_3);
         storage_live(_4);
-        _6 = transmute<NonNull<i32>, *const i32>(copy ((*x_2)).0);
+        _6 = transmute<NonNull<i32>[{built_in impl Destruct for i32}], *const i32>(copy ((*x_2)).0);
         _4 = &(*_6);
         _3 = &raw const (*_4);
         ptr_1 = move _3;
         storage_dead(_3);
         storage_dead(_4);
         // Box is freed here since borrowchecker does not keep track of raw pointer
-        drop[{impl#2}<i32, Global>] x_2 -> bb3 (unwind: bb4);
+        drop[{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<i32, Global>[{built_in impl Destruct for i32}, {impl Destruct for Global}]] x_2 -> bb3 (unwind: bb4);
     }
 
     bb3: {

@@ -29,7 +29,7 @@ let test ?(args = "") source =
   let cmd_out = run_charon json_filename rust_file args in
   try
     let json = Yojson.Basic.from_file json_filename in
-    match Charon.UllbcOfJson.crate_of_json json with
+    match Charon.OfJson.crate_of_json json with
     | Error err ->
         F.printf "Test failed: %s" err
     | Ok crate -> (

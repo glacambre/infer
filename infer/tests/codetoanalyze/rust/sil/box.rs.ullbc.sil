@@ -36,3 +36,9 @@ define box::main() : void {
       
 }
 
+declare core::marker::Destruct::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *void) : void
+
+declare alloc::alloc::Global::{core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+
+declare alloc::boxed::Box::{core::marker::Destruct for alloc::boxed::Box<T>[TraitClause@0, TraitClause@1]}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" **void) : void
+

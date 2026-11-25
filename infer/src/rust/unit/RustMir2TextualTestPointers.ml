@@ -392,6 +392,12 @@ let%expect_test "box" =
           throw "UnwindResume"
 
     }
+
+    declare core::marker::Destruct::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *void) : void
+
+    declare alloc::alloc::Global::{core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+
+    declare alloc::boxed::Box::{core::marker::Destruct for alloc::boxed::Box<T>[TraitClause@0, TraitClause@1]}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" **void) : void
     |}]
 
 
@@ -450,6 +456,12 @@ let%expect_test "box_memoryleak" =
           ret n0
 
     }
+
+    declare core::marker::Destruct::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *void) : void
+
+    declare alloc::alloc::Global::{core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+
+    declare alloc::boxed::Box::{core::marker::Destruct for alloc::boxed::Box<T>[TraitClause@0, TraitClause@1]}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" **void) : void
     |}]
 
 
@@ -526,9 +538,9 @@ let%expect_test "box_use_after_free" =
 
     }
 
-    declare alloc::alloc::Global::{TraitImpl@1}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+    declare alloc::alloc::Global::{core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
 
-    declare alloc::boxed::Box::{TraitImpl@2}::drop_in_place::<i32, alloc::alloc::Global>(.rust_mut = "mut" .rust_pointer = "pointer" **int) : void
+    declare alloc::boxed::Box::{core::marker::Destruct for alloc::boxed::Box<i32>[core::marker::Destruct<i32>, alloc::alloc::Global::{core::marker::Destruct for alloc::alloc::Global}]}::drop_in_place::<i32, alloc::alloc::Global>(.rust_mut = "mut" .rust_pointer = "pointer" **int) : void
     |}]
 
 

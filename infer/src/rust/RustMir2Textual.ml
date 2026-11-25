@@ -16,9 +16,7 @@ let fun_map_find_id (crate : Charon.UllbcAst.crate) fun_decl_id =
       decl
   | None ->
       L.die UserError "[ERROR] Unsupported fun type (fun_decl_id not found): @. > %s @."
-        (Charon.PrintTypes.fun_decl_id_to_string
-           (Charon.PrintUllbcAst.Crate.crate_to_fmt_env crate)
-           fun_decl_id )
+        (Charon.Print.fun_decl_id_to_string (Charon.Print.crate_to_fmt_env crate) fun_decl_id)
 
 
 let type_decl_map_find_id (crate : Charon.UllbcAst.crate) type_decl_id =
@@ -29,9 +27,7 @@ let type_decl_map_find_id (crate : Charon.UllbcAst.crate) type_decl_id =
   | None ->
       L.die UserError
         "[ERROR] Unsupported adt_typ_to_textual type (type_decl_ref not found): @. > %s @."
-        (Charon.PrintTypes.type_decl_id_to_string
-           (Charon.PrintUllbcAst.Crate.crate_to_fmt_env crate)
-           type_decl_id )
+        (Charon.Print.type_decl_id_to_string (Charon.Print.crate_to_fmt_env crate) type_decl_id)
 
 
 let global_decl_map_find_id (crate : Charon.UllbcAst.crate) global_decl_id =
@@ -41,9 +37,7 @@ let global_decl_map_find_id (crate : Charon.UllbcAst.crate) global_decl_id =
       decl
   | None ->
       L.die UserError "[ERROR] Unsupported global type (global_decls not found): @. > %s @."
-        (Charon.PrintTypes.global_decl_id_to_string
-           (Charon.PrintUllbcAst.Crate.crate_to_fmt_env crate)
-           global_decl_id )
+        (Charon.Print.global_decl_id_to_string (Charon.Print.crate_to_fmt_env crate) global_decl_id)
 
 
 let location_from_span (span : Charon.Generated_Meta.span) : Textual.Location.t =
@@ -59,9 +53,7 @@ let location_from_span_end (span : Charon.Generated_Meta.span) : Textual.Locatio
 
 
 let name_of_path_element crate (path_element : Charon.Generated_Types.path_elem) : string =
-  Charon.PrintTypes.path_elem_to_string
-    (Charon.PrintUllbcAst.Crate.crate_to_fmt_env crate)
-    path_element
+  Charon.Print.path_elem_to_string (Charon.Print.crate_to_fmt_env crate) path_element
 
 
 let name_of_field (field : Charon.Generated_Types.field) (field_id : int) : Textual.FieldName.t =
@@ -173,10 +165,10 @@ let mk_label (id : int) : Textual.NodeName.t =
   "node_" ^ string_of_int id |> Textual.NodeName.of_string
 
 
-let params_from_fun_decl (fun_decl : Charon.UllbcAst.blocks Charon.GAst.gfun_decl) (arg_count : int)
-    : Textual.VarName.t list =
+let params_from_fun_decl (fun_decl : Charon.GAst.fun_decl) (arg_count : int) :
+    Textual.VarName.t list =
   match fun_decl.body with
-  | Body {locals= {locals= _ :: locals_list}} ->
+  | UnstructuredBody {locals= {locals= _ :: locals_list}} ->
       List.take locals_list arg_count
       |> List.mapi ~f:(fun i (local : Charon.Generated_GAst.local) -> mk_varname local (i + 1))
   | _ ->
@@ -957,8 +949,7 @@ let mk_typedesc (crate : Charon.UllbcAst.crate) (type_decl : Charon.Generated_Ty
       []
 
 
-let mk_procdesc (crate : Charon.UllbcAst.crate)
-    (fun_decl : Charon.UllbcAst.blocks Charon.GAst.gfun_decl)
+let mk_procdesc (crate : Charon.UllbcAst.crate) (fun_decl : Charon.GAst.fun_decl)
     (body : 'body Charon.Generated_GAst.gexpr_body) : Textual.ProcDesc.t =
   let blocks = body.body in
   let locals = body.locals.locals in
@@ -974,11 +965,10 @@ let mk_procdesc (crate : Charon.UllbcAst.crate)
   {Textual.ProcDesc.procdecl; fresh_ident; nodes; start; params; locals; exit_loc}
 
 
-let mk_decl crate (fun_decl : Charon.UllbcAst.blocks Charon.GAst.gfun_decl) :
-    Textual.Module.decl option =
+let mk_decl crate (fun_decl : Charon.GAst.fun_decl) : Textual.Module.decl option =
   try
     match fun_decl.body with
-    | Body body -> (
+    | UnstructuredBody body -> (
       try Some (Textual.Module.Proc (mk_procdesc crate fun_decl body))
       with L.InferUserError s ->
         L.user_warning "[WARNING] Trying procdecl for %s: @. [REASON]: %s @."
@@ -987,13 +977,15 @@ let mk_decl crate (fun_decl : Charon.UllbcAst.blocks Charon.GAst.gfun_decl) :
         Some (Textual.Module.Procdecl (mk_procdecl crate fun_decl)) )
     (* Keep declarations for functions without a translatable body, including external functions,
        opaque functions, and trait methods without default implementations. *)
-    | TraitMethodWithoutDefault
-    | Extern _
-    | Intrinsic _
-    | TargetDispatch _
-    | Opaque
-    | Missing
-    | Error _ ->
+    | StructuredBody _ ->
+        L.die UserError "Expected ULLBC, but found a structured LLBC body"
+    | TraitMethodWithoutDefaultBody
+    | ExternBody _
+    | IntrinsicBody _
+    | TargetDispatchBody _
+    | OpaqueBody
+    | MissingBody
+    | ErrorBody _ ->
         Some (Textual.Module.Procdecl (mk_procdecl crate fun_decl))
   with L.InferUserError s ->
     (* Catch Translation error so that other functions can still be translated *)
@@ -1049,19 +1041,19 @@ let mk_tuple_type crate (local : Charon.Generated_GAst.local) =
   mk_tuple local.local_ty
 
 
-let mk_tuple_decl (crate : Charon.UllbcAst.crate)
-    (fun_decl : Charon.UllbcAst.blocks Charon.GAst.gfun_decl) =
+let mk_tuple_decl (crate : Charon.UllbcAst.crate) (fun_decl : Charon.GAst.fun_decl) =
   let locals =
     match fun_decl.body with
-    | Body {locals} ->
+    | UnstructuredBody {locals} ->
         locals.locals
-    | TraitMethodWithoutDefault
-    | Extern _
-    | Intrinsic _
-    | TargetDispatch _
-    | Opaque
-    | Missing
-    | Error _ ->
+    | StructuredBody _
+    | TraitMethodWithoutDefaultBody
+    | ExternBody _
+    | IntrinsicBody _
+    | TargetDispatchBody _
+    | OpaqueBody
+    | MissingBody
+    | ErrorBody _ ->
         []
   in
   List.concat_map locals ~f:(mk_tuple_type crate)
@@ -1104,7 +1096,7 @@ let mk_module (crate : Charon.UllbcAst.crate) ~file_name : Textual.Module.t =
   in
   let proc_decls =
     Charon.Generated_Types.FunDeclId.Map.values fun_decls
-    |> List.filter ~f:(fun (decl : Charon.UllbcAst.blocks Charon.GAst.gfun_decl) ->
+    |> List.filter ~f:(fun (decl : Charon.GAst.fun_decl) ->
         filter_unit_metadata crate decl.item_meta )
     |> List.filter_map ~f:(fun proc -> mk_decl crate proc)
   in
