@@ -210,6 +210,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
     pub(crate) fn outermost_generics_mut(&mut self) -> &mut GenericParams {
         &mut self.outermost_binder_mut().params
     }
+    #[expect(dead_code)]
     pub(crate) fn innermost_generics(&self) -> &GenericParams {
         &self.innermost_binder().params
     }
@@ -357,7 +358,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
     fn push_late_bound_generics_for_def(
         &mut self,
         _span: Span,
-        def: &hax::FullDef,
+        def: &hax::FullDef<'tcx>,
     ) -> Result<(), Error> {
         if let hax::FullDefKind::Fn { sig, .. } | hax::FullDefKind::AssocFn { sig, .. } = def.kind()
         {
@@ -370,7 +371,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
 
     /// Add the generics and predicates of this item and its parents to the current context.
     #[tracing::instrument(skip(self, span, def))]
-    fn push_generics_for_def(&mut self, span: Span, def: &hax::FullDef) -> Result<(), Error> {
+    fn push_generics_for_def(&mut self, span: Span, def: &hax::FullDef<'tcx>) -> Result<(), Error> {
         trace!("{:?}", def.param_env());
         // Add generics from the parent item, recursively (recursivity is important for closures,
         // as they can be nested).
@@ -387,34 +388,45 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
     fn push_generics_for_def_without_parents(
         &mut self,
         _span: Span,
-        def: &hax::FullDef,
+        def: &hax::FullDef<'tcx>,
     ) -> Result<(), Error> {
-        use crate::hax::FullDefKind;
         if let Some(param_env) = def.param_env() {
-            // Add the generic params.
-            self.push_generic_params(&param_env.generics)?;
-            // Add the predicates.
-            let origin = match &def.kind {
-                FullDefKind::Adt { .. }
-                | FullDefKind::TyAlias { .. }
-                | FullDefKind::AssocTy { .. } => PredicateOrigin::WhereClauseOnType,
-                FullDefKind::Fn { .. }
-                | FullDefKind::AssocFn { .. }
-                | FullDefKind::Closure { .. }
-                | FullDefKind::Const { .. }
-                | FullDefKind::AssocConst { .. }
-                | FullDefKind::Static { .. } => PredicateOrigin::WhereClauseOnFn,
-                FullDefKind::TraitImpl { .. } | FullDefKind::InherentImpl { .. } => {
-                    PredicateOrigin::WhereClauseOnImpl
-                }
-                FullDefKind::Trait { .. } | FullDefKind::TraitAlias { .. } => {
-                    PredicateOrigin::WhereClauseOnTrait
-                }
-                _ => panic!("Unexpected def: {:?}", def.def_id().kind),
-            };
-            self.register_predicates(&param_env.predicates, origin.clone())?;
+            let origin = Self::predicate_origin_for_def(def);
+            self.push_param_env_without_parents(param_env, origin)?;
         }
 
+        Ok(())
+    }
+
+    fn predicate_origin_for_def(def: &hax::FullDef<'tcx>) -> PredicateOrigin {
+        use crate::hax::FullDefKind;
+        match &def.kind {
+            FullDefKind::Adt { .. } | FullDefKind::TyAlias { .. } | FullDefKind::AssocTy { .. } => {
+                PredicateOrigin::WhereClauseOnType
+            }
+            FullDefKind::Fn { .. }
+            | FullDefKind::AssocFn { .. }
+            | FullDefKind::Closure { .. }
+            | FullDefKind::Const { .. }
+            | FullDefKind::AssocConst { .. }
+            | FullDefKind::Static { .. } => PredicateOrigin::WhereClauseOnFn,
+            FullDefKind::TraitImpl { .. } | FullDefKind::InherentImpl { .. } => {
+                PredicateOrigin::WhereClauseOnImpl
+            }
+            FullDefKind::Trait { .. } | FullDefKind::TraitAlias { .. } => {
+                PredicateOrigin::WhereClauseOnTrait
+            }
+            _ => panic!("Unexpected def: {:?}", def.def_id().kind),
+        }
+    }
+
+    fn push_param_env_without_parents(
+        &mut self,
+        param_env: &hax::ParamEnv,
+        origin: PredicateOrigin,
+    ) -> Result<(), Error> {
+        self.push_generic_params(&param_env.generics)?;
+        self.register_predicates(&param_env.predicates, origin)?;
         Ok(())
     }
 
@@ -428,7 +440,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
     pub fn translate_item_generics(
         &mut self,
         span: Span,
-        def: &hax::FullDef,
+        def: &hax::FullDef<'tcx>,
         kind: &TransItemSourceKind,
     ) -> Result<(), Error> {
         assert!(self.binding_levels.is_empty());
@@ -475,7 +487,6 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
     where
         F: FnOnce(&mut Self) -> Result<U, Error>,
     {
-        assert!(!self.binding_levels.is_empty());
         self.binding_levels.push(BindingLevel::new());
 
         // Call the continuation. Important: do not short-circuit on error here.
@@ -498,7 +509,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         &mut self,
         span: Span,
         kind: BinderKind,
-        def: &hax::FullDef,
+        def: &hax::FullDef<'tcx>,
         f: F,
     ) -> Result<Binder<U>, Error>
     where
@@ -511,6 +522,32 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
             this.push_late_bound_generics_for_def(span, def)?;
             this.innermost_binder().params.check_consistency();
             f(this)
+        });
+        self.hax_state = outer_hax_state;
+        ret
+    }
+
+    /// Push a new binding level corresponding to the provided item binder for the duration of the
+    /// inner function call.
+    pub(crate) fn translate_item_binder<F, T, U>(
+        &mut self,
+        _span: Span,
+        kind: BinderKind,
+        binder: &hax::TraitItemBinder<T>,
+        predicate_origin: PredicateOrigin,
+        f: F,
+    ) -> Result<Binder<U>, Error>
+    where
+        F: FnOnce(&mut Self, &T) -> Result<U, Error>,
+    {
+        let inner_hax_state = self.t_ctx.hax_state.clone().with_hax_owner(&binder.def_id);
+        let outer_hax_state = mem::replace(&mut self.hax_state, inner_hax_state);
+        let ret = self.inside_binder(kind, |this| {
+            this.push_param_env_without_parents(&binder.param_env, predicate_origin)?;
+            this.innermost_binder_mut()
+                .push_params_from_binder(binder.late_bound.clone())?;
+            this.innermost_binder().params.check_consistency();
+            f(this, &binder.skip_binder)
         });
         self.hax_state = outer_hax_state;
         ret
@@ -636,7 +673,7 @@ impl LifetimeMutabilityComputer {
             let tcx = s.base().tcx;
             let def_id = item.real_rust_def_id();
             let adt_def = tcx.adt_def(def_id);
-            let generics = ty::GenericArgs::identity_for_item(tcx, def_id);
+            let generics = item.identity_args(s);
             for variant in adt_def.variants() {
                 for field in &variant.fields {
                     field.ty(tcx, generics).visit_with(&mut visitor);

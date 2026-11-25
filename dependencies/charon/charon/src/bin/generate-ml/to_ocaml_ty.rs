@@ -165,7 +165,7 @@ impl<'a> GenerateCtx<'a> {
                     && fields[0].name.as_ref().is_some_and(|name| name == "_raw") =>
             {
                 // These are the special strongly-typed integers.
-                let short_name = decl.item_meta.name.short_str();
+                let short_name = decl.item_meta.name.short_str().unwrap();
                 format!("{short_name}.id [@visitors.opaque]")
             }
             TypeDeclKind::Struct(fields)
@@ -176,8 +176,7 @@ impl<'a> GenerateCtx<'a> {
                             .attr_info
                             .attributes
                             .iter()
-                            .filter_map(|a| a.as_unknown())
-                            .any(|a| a.to_string() == "serde(transparent)")) =>
+                            .any(|a| a.is_transparent())) =>
             {
                 let ty = self.type_to_ocaml_name(&fields[0].ty);
                 format!("{ty} {opaque}")
@@ -432,14 +431,7 @@ impl<'a> GenerateCtx<'a> {
             .enumerate()
             .map(|(i, ty)| {
                 let co_recursive = i != 0;
-                self.with_item(ty, |ctx| {
-                    ctx.type_decl_to_ocaml_decl(
-                        &opaque_for_visitors,
-                        &manual_impls,
-                        ty,
-                        co_recursive,
-                    )
-                })
+                self.type_decl_to_ocaml_decl(&opaque_for_visitors, &manual_impls, ty, co_recursive)
             })
             .join("\n");
         match visitors {

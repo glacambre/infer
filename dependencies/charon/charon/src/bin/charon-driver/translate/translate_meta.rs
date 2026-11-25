@@ -7,7 +7,6 @@ use std::path::{Component, PathBuf};
 
 use super::translate_crate::RustcItem;
 use super::translate_ctx::*;
-use super::translate_generics::BindingLevel;
 use crate::hax;
 use crate::hax::{DefPathItem, SInto};
 use charon_lib::ast::*;
@@ -40,6 +39,17 @@ impl<'tcx> TranslateCtx<'tcx> {
             rustc_span::FileName::Real(name) => {
                 match name.local_path() {
                     Some(path) => {
+                        // Normalize path separators: cross-compiling to Windows uses `\` as path
+                        // separators.
+                        let path: PathBuf = {
+                            let mut normalized = PathBuf::new();
+                            for comp in path.components() {
+                                for segment in comp.as_os_str().to_string_lossy().split("\\") {
+                                    normalized.push(segment);
+                                }
+                            }
+                            normalized
+                        };
                         let path = if let Ok(path) = path.strip_prefix(&self.sysroot) {
                             // The path to files in the standard library may be full paths to somewhere
                             // in the sysroot. This may depend on how the toolchain is installed
@@ -71,7 +81,7 @@ impl<'tcx> TranslateCtx<'tcx> {
                                 rewritten_path.extend(path);
                                 rewritten_path
                             } else {
-                                path.into()
+                                path
                             }
                         };
                         FileName::Local(path)
@@ -378,7 +388,8 @@ impl<'tcx> TranslateCtx<'tcx> {
                 let impl_id = self.register_and_enqueue(&None, src.clone()).unwrap();
                 name.name.push(PathElem::Impl(ImplElem::Trait(impl_id)));
             }
-            TransItemSourceKind::DefaultedMethod(_, method_name) => {
+            TransItemSourceKind::DefaultedMethod(_, trait_id, method_id) => {
+                let method_name = self.translated.assoc_item_name(*trait_id, *method_id);
                 name.name.push(PathElem::Ident(
                     method_name.to_string(),
                     Disambiguator::ZERO,
@@ -417,22 +428,6 @@ impl<'tcx> TranslateCtx<'tcx> {
                     Disambiguator::ZERO,
                 ));
             }
-            TransItemSourceKind::VTableDropPreShim => {
-                name.name.push(PathElem::Ident(
-                    "{vtable_drop_preshim}".into(),
-                    Disambiguator::ZERO,
-                ));
-            }
-            TransItemSourceKind::VTableMethodPreShim(_, method_name) => {
-                name.name.push(PathElem::Ident(
-                    method_name.to_string(),
-                    Disambiguator::ZERO,
-                ));
-                name.name.push(PathElem::Ident(
-                    "{vtable_method_preshim}".into(),
-                    Disambiguator::ZERO,
-                ));
-            }
         }
         Ok(name)
     }
@@ -440,97 +435,23 @@ impl<'tcx> TranslateCtx<'tcx> {
     /// Retrieve the name for an item.
     pub fn translate_name(&mut self, src: &TransItemSource) -> Result<Name, Error> {
         let mut name = self.name_for_src(src)?;
-        // Push the generics used for monomorphization, if any.
+        // Push the generics used for monomorphization, if any. We skip mono trait impls as the
+        // generics are already included in the `PathElem::Impl` reference.
         if let RustcItem::Mono(item_ref) = &src.item
             && !item_ref.generic_args.is_empty()
+            && !matches!(src.kind, TransItemSourceKind::TraitImpl(..))
         {
-            // For preshim functions in Mono mode, we compute their generic and associative arguments,
-            // which are appended to the name of these functions.
-            let is_preshim = matches!(
-                src.kind,
-                TransItemSourceKind::VTableDropPreShim
-                    | TransItemSourceKind::VTableMethodPreShim(..)
-            );
-
             let trans_id = self.register_no_enqueue(&None, src).unwrap();
             let span = self.def_span(&item_ref.def_id);
             let mut bt_ctx = ItemTransCtx::new(src.clone(), trans_id, self);
-            bt_ctx.binding_levels.push(BindingLevel::new());
-
-            let trait_def = bt_ctx.t_ctx.hax_def_for_item(&src.item)?;
-            let mut assoc_types = None;
-
-            // fetch associative arguments
-            if let hax::FullDefKind::Trait { items, .. } = trait_def.kind() {
-                for item in items {
-                    if matches!(item.kind, hax::AssocKind::Type { .. }) {
-                        let item_def_id = &item.def_id;
-                        // This is ok because dyn-compatible methods don't have generics.
-                        let item_def = bt_ctx.hax_def(
-                            &trait_def
-                                .this()
-                                .with_def_id(bt_ctx.hax_state(), item_def_id),
-                        )?;
-                        if let hax::FullDefKind::AssocTy {
-                            implied_predicates, ..
-                        } = item_def.kind()
-                            && let Some(pred) = implied_predicates.predicates.first()
-                            && let hax::ClauseKind::Trait(p) = &pred.clause.kind.value
-                        {
-                            assoc_types = Some(p.trait_ref.generic_args.clone());
-                            break;
-                        }
-                    }
-                }
-            }
-            // fetch generic arguments
-            let mut substs = item_ref.generic_args.clone();
-
-            if !(is_preshim && item_ref.generic_args.len() == 1 && assoc_types.is_none()) {
-                // For preshim functions, skip the first argument, which is the dyn trait type.
-                let args = if is_preshim {
-                    if let Some(mut assoc_types) = assoc_types {
-                        substs.append(&mut assoc_types);
-                    }
-                    bt_ctx.translate_generic_args(span, &substs[1..], &item_ref.impl_exprs)?
-                } else {
-                    bt_ctx.translate_generic_args(span, &substs, &item_ref.impl_exprs)?
-                };
-                name.name.push(PathElem::Instantiated(Box::new(Binder {
-                    params: GenericParams::empty(),
-                    skip_binder: args,
-                    kind: BinderKind::Other,
-                })));
+            let binder = bt_ctx.inside_binder(BinderKind::Other, |bt_ctx| {
+                bt_ctx.translate_generic_args(span, &item_ref.generic_args, &item_ref.trait_proofs)
+            })?;
+            if !binder.skip_binder.is_empty() {
+                name.name.push(PathElem::Instantiated(Box::new(binder)));
             }
         }
         Ok(name)
-    }
-
-    /// Remark: this **doesn't** register the def id (on purpose)
-    pub(crate) fn translate_trait_item_name(
-        &mut self,
-        def_id: &hax::DefId,
-    ) -> Result<TraitItemName, Error> {
-        let def = self.poly_hax_def(def_id)?;
-        let assoc = match def.kind() {
-            hax::FullDefKind::AssocTy {
-                associated_item, ..
-            }
-            | hax::FullDefKind::AssocConst {
-                associated_item, ..
-            }
-            | hax::FullDefKind::AssocFn {
-                associated_item, ..
-            } => associated_item,
-            _ => panic!("Unexpected def for associated item: {def:?}"),
-        };
-        Ok(TraitItemName(
-            assoc
-                .name
-                .as_ref()
-                .map(|n| n.to_string().into())
-                .unwrap_or_default(),
-        ))
     }
 
     pub(crate) fn opacity_for_name(&self, name: &Name) -> ItemOpacity {
@@ -576,6 +497,8 @@ impl<'tcx> TranslateCtx<'tcx> {
             "opaque" if args.is_none() => Attribute::Opaque,
             // `#[charon::opaque]`
             "exclude" if args.is_none() => Attribute::Exclude,
+            // `#[charon::transparent]`
+            "transparent" if args.is_none() => Attribute::Transparent,
             // `#[charon::rename("new_name")]`
             "rename" if let Some(attr) = args => {
                 let Some(attr) = attr
@@ -681,7 +604,7 @@ impl<'tcx> TranslateCtx<'tcx> {
         }
     }
 
-    pub(crate) fn translate_inline(&self, def: &hax::FullDef) -> Option<InlineAttr> {
+    pub(crate) fn translate_inline(&self, def: &hax::FullDef<'tcx>) -> Option<InlineAttr> {
         match def.kind() {
             hax::FullDefKind::Fn { inline, .. }
             | hax::FullDefKind::AssocFn { inline, .. }
@@ -696,7 +619,7 @@ impl<'tcx> TranslateCtx<'tcx> {
         }
     }
 
-    pub(crate) fn translate_attr_info(&mut self, def: &hax::FullDef) -> AttrInfo {
+    pub(crate) fn translate_attr_info(&mut self, def: &hax::FullDef<'tcx>) -> AttrInfo {
         // Default to `false` for impl blocks and closures.
         let public = def.visibility.unwrap_or(false);
         let inline = self.translate_inline(def);
@@ -733,14 +656,14 @@ impl<'tcx> TranslateCtx<'tcx> {
 // `ItemMeta`
 impl<'tcx> TranslateCtx<'tcx> {
     /// Whether this item is in an `extern { .. }` block, in which case it has no body.
-    pub(crate) fn is_extern_item(&mut self, def: &hax::FullDef) -> bool {
+    pub(crate) fn is_extern_item(&mut self, def: &hax::FullDef<'tcx>) -> bool {
         def.def_id()
             .parent(&self.hax_state)
             .is_some_and(|parent| matches!(parent.kind, hax::DefKind::ForeignMod))
     }
 
     /// If this is an item declared in an `extern { .. }` block, return its symbol name.
-    pub(crate) fn extern_item_symbol_name(&mut self, def: &hax::FullDef) -> Option<String> {
+    pub(crate) fn extern_item_symbol_name(&mut self, def: &hax::FullDef<'tcx>) -> Option<String> {
         if !self.is_extern_item(def) {
             return None;
         }
@@ -756,7 +679,7 @@ impl<'tcx> TranslateCtx<'tcx> {
     /// Compute the meta information for a Rust item.
     pub(crate) fn translate_item_meta(
         &mut self,
-        def: &hax::FullDef,
+        def: &hax::FullDef<'tcx>,
         item_src: &TransItemSource,
         name: Name,
         name_opacity: ItemOpacity,

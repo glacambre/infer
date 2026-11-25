@@ -10,33 +10,13 @@ pub trait MetaSized<Self>
 #[lang_item("sized")]
 pub trait Sized<Self>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    proof ImpliedClause0: (Self: MetaSized)
     non-dyn-compatible
 }
 
 // Full name: core::marker::Destruct
 #[lang_item("destruct")]
 pub trait Destruct<Self>
-
-// Full name: core::marker::Tuple
-#[lang_item("tuple_trait")]
-pub trait Tuple<Self>
-{
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    non-dyn-compatible
-}
-
-opaque type core::ops::function::FnOnce::{vtable}
-
-// Full name: core::ops::function::FnOnce
-#[lang_item("fn_once")]
-pub trait FnOnce<Self, Args>
-{
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    parent_clause1 : [@TraitClause1]: Sized<Args>
-    parent_clause2 : [@TraitClause2]: Tuple<Args>
-    vtable: core::ops::function::FnOnce::{vtable}
-}
 
 // Full name: test_crate::NotCopy
 struct NotCopy {}
@@ -46,31 +26,43 @@ struct closure {
   NotCopy,
 }
 
-// Full name: core::ops::function::FnOnce::call_once
-pub fn call_once(_1: closure, _2: (u8,)) -> u8
+unsafe fn core::marker::Destruct::drop_in_place::<closure>(_1: *mut closure)
 = <opaque>
 
-// Full name: UNIT_METADATA
-fn UNIT_METADATA()
+// Full name: core::marker::Tuple
+#[lang_item("tuple_trait")]
+pub trait Tuple<Self>
 {
-    let _0: (); // return
-
-    _0 = ()
-    return
+    proof ImpliedClause0: (Self: MetaSized)
+    non-dyn-compatible
 }
 
-// Full name: UNIT_METADATA
-const UNIT_METADATA: () = UNIT_METADATA()
+opaque type core::ops::function::FnOnce::{vtable}
+
+// Full name: core::ops::function::FnOnce
+#[lang_item("fn_once")]
+pub trait FnOnce<Self, Args>
+{
+    proof ImpliedClause0: (Self: MetaSized)
+    proof ImpliedClause1: (Args: Sized)
+    proof ImpliedClause2: (Args: Tuple)
+    vtable: core::ops::function::FnOnce::{vtable}
+}
+
+// Full name: core::ops::function::FnOnce::call_once
+pub extern "rust-call" fn call_once(_1: closure, _2: (u8,)) -> u8
+= <opaque>
 
 // Full name: test_crate::main::closure::{impl Destruct for closure}
-impl Destruct for closure {    non-dyn-compatible
+impl Destruct for closure {
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl FnOnce<(u8,)> for closure}
 impl FnOnce<(u8,)> for closure {
-    parent_clause0 = {built_in impl MetaSized for closure}
-    parent_clause1 = {built_in impl Sized for (u8,)}
-    parent_clause2 = {built_in impl Tuple for (u8,)}
+    proof ImpliedClause0: (closure: MetaSized) = {built_in impl MetaSized for closure}
+    proof ImpliedClause1: ((u8,): Sized) = {built_in impl Sized for (u8,)}
+    proof ImpliedClause2: ((u8,): Tuple) = {built_in impl Tuple for (u8,)}
     non-dyn-compatible
 }
 
@@ -89,7 +81,7 @@ fn apply_to_zero_once::<closure>(f_1: closure) -> u8
     _0 = {impl FnOnce<(u8,)> for closure}::call_once(move _2, move _3)
     storage_dead(_3)
     storage_dead(_2)
-    conditional_drop[{impl Destruct for closure}] f_1
+    conditional_drop[{impl Destruct for closure}::drop_in_place] f_1
     return
 }
 
@@ -116,15 +108,12 @@ fn main()
 }
 
 // Full name: test_crate::main::closure::{impl Destruct for closure}::drop_in_place
-unsafe fn drop_in_place(_1: *mut closure)
+unsafe fn {impl Destruct for closure}::drop_in_place(_1: *mut closure)
 {
     let _0: (); // return
-    let _1: *mut closure; // arg #1
-    let _2: &'1 mut closure; // anonymous local
+    let _1: &'1 mut closure; // arg #1
 
-    storage_live(_2)
     _0 = ()
-    _2 = &mut (*_1)
     return
 }
 

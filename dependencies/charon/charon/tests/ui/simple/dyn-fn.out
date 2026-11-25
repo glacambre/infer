@@ -1,5 +1,7 @@
 # Final LLBC before serialization:
 
+opaque type core::marker::MetaSized::{vtable}
+
 // Full name: core::marker::MetaSized
 #[lang_item("meta_sized")]
 pub trait MetaSized<Self>
@@ -8,7 +10,7 @@ pub trait MetaSized<Self>
 #[lang_item("sized")]
 pub trait Sized<Self>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    proof ImpliedClause0: (Self: MetaSized)
     non-dyn-compatible
 }
 
@@ -27,87 +29,84 @@ unsafe fn core::marker::Destruct::drop_in_place<Self>(_1: *mut Self)
 #[lang_item("tuple_trait")]
 pub trait Tuple<Self>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    proof ImpliedClause0: (Self: MetaSized)
     non-dyn-compatible
 }
-
-opaque type core::ops::function::Fn::{vtable}<Args, Ty0>
 
 // Full name: core::ops::function::FnOnce
 #[lang_item("fn_once")]
 pub trait FnOnce<Self, Args>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    parent_clause1 : [@TraitClause1]: Sized<Args>
-    parent_clause2 : [@TraitClause2]: Tuple<Args>
-    parent_clause3 : [@TraitClause3]: Sized<Self::Output>
+    proof ImpliedClause0: (Self: MetaSized)
+    proof ImpliedClause1: (Args: Sized)
+    proof ImpliedClause2: (Args: Tuple)
+    proof ImpliedClause3: (Self::Output: Sized)
     type Output
     fn call_once = core::ops::function::FnOnce::call_once<Self, Args>[Self]
     vtable: core::ops::function::FnOnce::{vtable}<Args, Self::Output>
 }
 
+opaque type core::ops::function::FnMut::{vtable}<Args, Ty0>
+
 // Full name: core::ops::function::FnMut
 #[lang_item("fn_mut")]
 pub trait FnMut<Self, Args>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    parent_clause1 : [@TraitClause1]: FnOnce<Self, Args>
-    parent_clause2 : [@TraitClause2]: Sized<Args>
-    parent_clause3 : [@TraitClause3]: Tuple<Args>
+    proof ImpliedClause0: (Self: MetaSized)
+    proof ImpliedClause1: (Self: FnOnce<Args>)
+    proof ImpliedClause2: (Args: Sized)
+    proof ImpliedClause3: (Args: Tuple)
     fn call_mut<'_0_1> = core::ops::function::FnMut::call_mut<'_0_1, Self, Args>[Self]
-    vtable: core::ops::function::FnMut::{vtable}<Args, Self::parent_clause1::Output>
+    vtable: core::ops::function::FnMut::{vtable}<Args, Self::ImpliedClause1::Output>
+}
+
+struct core::ops::function::Fn::{vtable}<Args, Ty0> {
+  size: usize,
+  align: usize,
+  drop: unsafe fn(*mut (dyn Fn<Args, ImpliedClause1::ImpliedClause1::Output = Ty0>)),
+  method_call: extern "rust-call" fn<'_0_1>(&'_0_1 (dyn Fn<Args, ImpliedClause1::ImpliedClause1::Output = Ty0>), Args) -> Ty0,
+  super_trait_0: &'static core::marker::MetaSized::{vtable},
+  super_trait_1: &'static core::ops::function::FnMut::{vtable}<Args, Ty0>,
 }
 
 // Full name: core::ops::function::Fn
 #[lang_item("fn")]
 pub trait Fn<Self, Args>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    parent_clause1 : [@TraitClause1]: FnMut<Self, Args>
-    parent_clause2 : [@TraitClause2]: Sized<Args>
-    parent_clause3 : [@TraitClause3]: Tuple<Args>
+    proof ImpliedClause0: (Self: MetaSized)
+    proof ImpliedClause1: (Self: FnMut<Args>)
+    proof ImpliedClause2: (Args: Sized)
+    proof ImpliedClause3: (Args: Tuple)
     fn call<'_0_1> = core::ops::function::Fn::call<'_0_1, Self, Args>[Self]
-    vtable: core::ops::function::Fn::{vtable}<Args, Self::parent_clause1::parent_clause1::Output>
+    vtable: core::ops::function::Fn::{vtable}<Args, Self::ImpliedClause1::ImpliedClause1::Output>
 }
 
-pub fn core::ops::function::Fn::call<'_0, Self, Args>(_1: &'_0 Self, _2: Args) -> @TraitClause0::parent_clause1::parent_clause1::Output
+pub extern "rust-call" fn core::ops::function::Fn::call<'_0, Self, Args>(_1: &'_0 Self, _2: Args) -> TraitClause0::ImpliedClause1::ImpliedClause1::Output
 where
-    [@TraitClause0]: Fn<Self, Args>,
+    TraitClause0: (Self: Fn<Args>),
+= <method_without_default_body>
+
+pub extern "rust-call" fn core::ops::function::FnMut::call_mut<'_0, Self, Args>(_1: &'_0 mut Self, _2: Args) -> TraitClause0::ImpliedClause1::Output
+where
+    TraitClause0: (Self: FnMut<Args>),
 = <opaque>
 
-pub fn core::ops::function::FnMut::call_mut<'_0, Self, Args>(_1: &'_0 mut Self, _2: Args) -> @TraitClause0::parent_clause1::Output
+pub extern "rust-call" fn core::ops::function::FnOnce::call_once<Self, Args>(_1: Self, _2: Args) -> TraitClause0::Output
 where
-    [@TraitClause0]: FnMut<Self, Args>,
+    TraitClause0: (Self: FnOnce<Args>),
 = <opaque>
-
-pub fn core::ops::function::FnOnce::call_once<Self, Args>(_1: Self, _2: Args) -> @TraitClause0::Output
-where
-    [@TraitClause0]: FnOnce<Self, Args>,
-= <opaque>
-
-// Full name: UNIT_METADATA
-fn UNIT_METADATA()
-{
-    let _0: (); // return
-
-    _0 = ()
-    return
-}
-
-// Full name: UNIT_METADATA
-const UNIT_METADATA: () = UNIT_METADATA()
 
 // Full name: test_crate::takes_fn
-fn takes_fn<'_0>(f_1: &'_0 (dyn for<'a> Fn<(&'a mut u32,), parent_clause1::parent_clause1::Output = bool> + '_0))
+fn takes_fn<'_0>(f_1: &'_0 (dyn for<'a> Fn<(&'a mut u32,), ImpliedClause1::ImpliedClause1::Output = bool> + '_0))
 {
     let _0: (); // return
-    let f_1: &'10 (dyn for<'a> Fn<(&'a mut u32,), parent_clause1::parent_clause1::Output = bool> + '11); // arg #1
+    let f_1: &'7 (dyn for<'a> Fn<(&'a mut u32,), ImpliedClause1::ImpliedClause1::Output = bool> + '8); // arg #1
     let counter_2: u32; // local
     let _3: bool; // anonymous local
-    let _4: &'13 (dyn for<'a> Fn<(&'a mut u32,), parent_clause1::parent_clause1::Output = bool> + '14); // anonymous local
-    let _5: (&'18 mut u32,); // anonymous local
-    let _6: &'19 mut u32; // anonymous local
-    let _7: &'20 mut u32; // anonymous local
+    let _4: &'10 (dyn for<'a> Fn<(&'a mut u32,), ImpliedClause1::ImpliedClause1::Output = bool> + '11); // anonymous local
+    let _5: (&'15 mut u32,); // anonymous local
+    let _6: &'16 mut u32; // anonymous local
+    let _7: &'17 mut u32; // anonymous local
 
     _0 = ()
     storage_live(counter_2)
@@ -121,7 +120,7 @@ fn takes_fn<'_0>(f_1: &'_0 (dyn for<'a> Fn<(&'a mut u32,), parent_clause1::paren
     _7 = &mut counter_2
     _6 = &two-phase-mut (*_7)
     _5 = (move _6,)
-    _3 = Fn<(dyn for<'a> Fn<(&'a mut u32,), parent_clause1::parent_clause1::Output = bool> + '31), (&'35 mut u32,)>::call<'36>(move _4, move _5)
+    _3 = (copy ((*_4.metadata)).method_call)(move _4, move _5)
     if move _3 {
         storage_dead(_7)
         storage_dead(_6)
@@ -179,12 +178,6 @@ fn {impl FnMut<(&'_ mut u32,)> for closure}::call_mut<'_0, '_1>(state_1: &'_1 mu
 unsafe fn {impl Destruct for closure}::drop_in_place(_1: *mut closure)
 = <missing>
 
-// Full name: test_crate::gives_fn::closure::{impl Destruct for closure}
-impl Destruct for closure {
-    fn drop_in_place = {impl Destruct for closure}::drop_in_place
-    non-dyn-compatible
-}
-
 // Full name: test_crate::gives_fn::{impl FnOnce<(&'_ mut u32,)> for closure}::call_once
 fn {impl FnOnce<(&'_ mut u32,)> for closure}::call_once<'_0>(_1: closure, _2: (&'_0 mut u32,)) -> bool
 {
@@ -196,16 +189,16 @@ fn {impl FnOnce<(&'_ mut u32,)> for closure}::call_once<'_0>(_1: closure, _2: (&
     storage_live(_3)
     _3 = &mut _1
     _0 = {impl FnMut<(&'_ mut u32,)> for closure}::call_mut<'_0, '8>(move _3, move _2)
-    drop[{impl Destruct for closure}] _1
+    drop[{impl Destruct for closure}::drop_in_place] _1
     return
 }
 
 // Full name: test_crate::gives_fn::{impl FnOnce<(&'_ mut u32,)> for closure}
 impl<'_0> FnOnce<(&'_ mut u32,)> for closure {
-    parent_clause0 = {built_in impl MetaSized for closure}
-    parent_clause1 = {built_in impl Sized for (&'_ mut u32,)}
-    parent_clause2 = {built_in impl Tuple for (&'_ mut u32,)}
-    parent_clause3 = {built_in impl Sized for bool}
+    proof ImpliedClause0: (closure: MetaSized) = {built_in impl MetaSized for closure}
+    proof ImpliedClause1: ((&'_ mut u32,): Sized) = {built_in impl Sized for (&'_ mut u32,)}
+    proof ImpliedClause2: ((&'_ mut u32,): Tuple) = {built_in impl Tuple for (&'_ mut u32,)}
+    proof ImpliedClause3: (bool: Sized) = {built_in impl Sized for bool}
     type Output = bool
     fn call_once = {impl FnOnce<(&'_ mut u32,)> for closure}::call_once<'_0>
     non-dyn-compatible
@@ -213,20 +206,20 @@ impl<'_0> FnOnce<(&'_ mut u32,)> for closure {
 
 // Full name: test_crate::gives_fn::{impl FnMut<(&'_ mut u32,)> for closure}
 impl<'_0> FnMut<(&'_ mut u32,)> for closure {
-    parent_clause0 = {built_in impl MetaSized for closure}
-    parent_clause1 = {impl FnOnce<(&'_ mut u32,)> for closure}<'_0>
-    parent_clause2 = {built_in impl Sized for (&'_ mut u32,)}
-    parent_clause3 = {built_in impl Tuple for (&'_ mut u32,)}
+    proof ImpliedClause0: (closure: MetaSized) = {built_in impl MetaSized for closure}
+    proof ImpliedClause1: (closure: FnOnce<(&'_ mut u32,)>) = {impl FnOnce<(&'_ mut u32,)> for closure}<'_0>
+    proof ImpliedClause2: ((&'_ mut u32,): Sized) = {built_in impl Sized for (&'_ mut u32,)}
+    proof ImpliedClause3: ((&'_ mut u32,): Tuple) = {built_in impl Tuple for (&'_ mut u32,)}
     fn call_mut<'_0_1> = {impl FnMut<(&'_ mut u32,)> for closure}::call_mut<'_0, '_0_1>
     non-dyn-compatible
 }
 
 // Full name: test_crate::gives_fn::{impl Fn<(&'_ mut u32,)> for closure}
 impl<'_0> Fn<(&'_ mut u32,)> for closure {
-    parent_clause0 = {built_in impl MetaSized for closure}
-    parent_clause1 = {impl FnMut<(&'_ mut u32,)> for closure}<'_0>
-    parent_clause2 = {built_in impl Sized for (&'_ mut u32,)}
-    parent_clause3 = {built_in impl Tuple for (&'_ mut u32,)}
+    proof ImpliedClause0: (closure: MetaSized) = {built_in impl MetaSized for closure}
+    proof ImpliedClause1: (closure: FnMut<(&'_ mut u32,)>) = {impl FnMut<(&'_ mut u32,)> for closure}<'_0>
+    proof ImpliedClause2: ((&'_ mut u32,): Sized) = {built_in impl Sized for (&'_ mut u32,)}
+    proof ImpliedClause3: ((&'_ mut u32,): Tuple) = {built_in impl Tuple for (&'_ mut u32,)}
     fn call<'_0_1> = {impl Fn<(&'_ mut u32,)> for closure}::call<'_0, '_0_1>
     non-dyn-compatible
 }
@@ -235,17 +228,20 @@ impl<'_0> Fn<(&'_ mut u32,)> for closure {
 fn gives_fn()
 {
     let _0: (); // return
-    let _1: &'10 (dyn for<'a> Fn<(&'a mut u32,), parent_clause1::parent_clause1::Output = bool> + '11); // anonymous local
-    let _2: &'14 closure; // anonymous local
-    let _3: &'15 closure; // anonymous local
-    let _4: &'16 closure; // anonymous local
-    let _5: &'28 closure; // anonymous local
-    let _6: closure; // anonymous local
+    let _1: &'7 (dyn for<'a> Fn<(&'a mut u32,), ImpliedClause1::ImpliedClause1::Output = bool> + '8); // anonymous local
+    let _2: &'11 closure; // anonymous local
+    let _3: &'12 closure; // anonymous local
+    let _4: &'13 closure; // anonymous local
+    let _5: &'14 closure; // anonymous local
+    let _6: &'25 closure; // anonymous local
+    let _7: closure; // anonymous local
 
     storage_live(_5)
     storage_live(_6)
-    _6 = closure {  }
-    _5 = &_6
+    storage_live(_7)
+    _7 = closure {  }
+    _6 = &_7
+    _5 = move _6
     storage_live(_4)
     _0 = ()
     storage_live(_1)
@@ -254,12 +250,18 @@ fn gives_fn()
     _4 = move _5
     _3 = &(*_4)
     _2 = &(*_3)
-    _1 = unsize_cast<&'14 closure, &'18 (dyn for<'a> Fn<(&'a mut u32,), parent_clause1::parent_clause1::Output = bool> + '19), &vtable_of({impl Fn<(&'_ mut u32,)> for closure}<'24>)>(move _2)
+    _1 = unsize_cast<&'11 closure, &'15 (dyn for<'a> Fn<(&'a mut u32,), ImpliedClause1::ImpliedClause1::Output = bool> + '16), &vtable_of({impl Fn<(&'_ mut u32,)> for closure}<'21>)>(move _2)
     storage_dead(_2)
-    _0 = takes_fn<'27>(move _1)
+    _0 = takes_fn<'24>(move _1)
     storage_dead(_1)
     storage_dead(_3)
     return
+}
+
+// Full name: test_crate::gives_fn::closure::{impl Destruct for closure}
+impl Destruct for closure {
+    fn drop_in_place = {impl Destruct for closure}::drop_in_place
+    non-dyn-compatible
 }
 
 

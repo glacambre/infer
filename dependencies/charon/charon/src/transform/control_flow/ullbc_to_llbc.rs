@@ -1001,14 +1001,14 @@ impl<'a> ReconstructCtx<'a> {
             src::TerminatorKind::Drop {
                 kind,
                 place,
-                tref,
+                fn_ptr,
                 target,
                 on_unwind: _,
             } => {
                 // TODO: Have unwinds in the LLBC
                 let st = tgt::Statement::new(
                     src_span,
-                    tgt::StatementKind::Drop(place.clone(), tref.clone(), *kind),
+                    tgt::StatementKind::Drop(place.clone(), fn_ptr.clone(), *kind),
                 );
                 let mut block = self.translate_jump(terminator.span, *target);
                 block.statements.insert(0, st);
@@ -1027,6 +1027,22 @@ impl<'a> ReconstructCtx<'a> {
                 };
                 let target = self.translate_jump(terminator.span, *target);
                 tgt::Statement::new(src_span, st).into_block().merge(target)
+            }
+            src::TerminatorKind::InlineAsm {
+                asm,
+                targets,
+                on_unwind: _,
+            } => {
+                // TODO: Have unwinds in the LLBC.
+                let targets = targets
+                    .iter()
+                    .map(|target| self.translate_jump(terminator.span, *target))
+                    .collect();
+                let st = tgt::StatementKind::InlineAsm {
+                    asm: asm.clone(),
+                    targets,
+                };
+                tgt::Statement::new(src_span, st).into_block()
             }
             src::TerminatorKind::Goto { target } => self.translate_jump(terminator.span, *target),
             src::TerminatorKind::Switch { discr, targets } => {

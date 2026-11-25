@@ -24,17 +24,17 @@ pub trait MetaSized<Self>
 #[lang_item("sized")]
 pub trait Sized<Self>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    proof ImpliedClause0: (Self: MetaSized)
     non-dyn-compatible
 }
 
-// Full name: core::ptr::alignment::Alignment
+// Full name: core::mem::alignment::Alignment
 pub opaque type Alignment
 
 // Full name: core::mem::SizedTypeProperties
 pub trait SizedTypeProperties<Self>
 {
-    parent_clause0 : [@TraitClause0]: Sized<Self>
+    proof ImpliedClause0: (Self: Sized)
     const SIZE : usize
     const ALIGN : usize
     const ALIGNMENT : Alignment
@@ -48,90 +48,90 @@ pub trait SizedTypeProperties<Self>
 #[lang_item("mem_size_const")]
 pub fn SIZE<Self>() -> usize
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
 = <opaque>
 
 // Full name: core::mem::SizedTypeProperties::SIZE
 #[lang_item("mem_size_const")]
 pub const SIZE<Self>: usize
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
  = SIZE()
 
 // Full name: core::mem::SizedTypeProperties::ALIGN
 #[lang_item("mem_align_const")]
 pub fn ALIGN<Self>() -> usize
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
 = <opaque>
 
 // Full name: core::mem::SizedTypeProperties::ALIGN
 #[lang_item("mem_align_const")]
 pub const ALIGN<Self>: usize
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
  = ALIGN()
 
 // Full name: core::mem::SizedTypeProperties::ALIGNMENT
 pub fn ALIGNMENT<Self>() -> Alignment
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
 = <opaque>
 
 // Full name: core::mem::SizedTypeProperties::ALIGNMENT
 pub const ALIGNMENT<Self>: Alignment
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
  = ALIGNMENT()
 
 // Full name: core::mem::SizedTypeProperties::IS_ZST
 pub fn IS_ZST<Self>() -> bool
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
 = <opaque>
 
 // Full name: core::mem::SizedTypeProperties::IS_ZST
 pub const IS_ZST<Self>: bool
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
  = IS_ZST()
 
 // Full name: core::mem::SizedTypeProperties::LAYOUT
 pub fn LAYOUT<Self>() -> Layout
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
 = <opaque>
 
 // Full name: core::mem::SizedTypeProperties::LAYOUT
 pub const LAYOUT<Self>: Layout
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
  = LAYOUT()
 
 // Full name: core::mem::SizedTypeProperties::MAX_SLICE_LEN
 pub fn MAX_SLICE_LEN<Self>() -> usize
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
 = <opaque>
 
 // Full name: core::mem::SizedTypeProperties::MAX_SLICE_LEN
 pub const MAX_SLICE_LEN<Self>: usize
 where
-    [@TraitClause0]: SizedTypeProperties<Self>,
+    TraitClause0: (Self: SizedTypeProperties),
  = MAX_SLICE_LEN()
 
 // Full name: core::mem::{impl SizedTypeProperties for T}
 impl<T> SizedTypeProperties for T
 where
-    [@TraitClause0]: Sized<T>,
+    TraitClause0: (T: Sized),
 {
-    parent_clause0 = @TraitClause0
-    const SIZE = SIZE<T>[{impl SizedTypeProperties for T}<T>[@TraitClause0]]
-    const ALIGN = ALIGN<T>[{impl SizedTypeProperties for T}<T>[@TraitClause0]]
-    const ALIGNMENT = ALIGNMENT<T>[{impl SizedTypeProperties for T}<T>[@TraitClause0]]
-    const IS_ZST = IS_ZST<T>[{impl SizedTypeProperties for T}<T>[@TraitClause0]]
-    const LAYOUT = LAYOUT<T>[{impl SizedTypeProperties for T}<T>[@TraitClause0]]
-    const MAX_SLICE_LEN = MAX_SLICE_LEN<T>[{impl SizedTypeProperties for T}<T>[@TraitClause0]]
+    proof ImpliedClause0: (T: Sized) = TraitClause0
+    const SIZE = SIZE<T>[{impl SizedTypeProperties for T}<T>[TraitClause0]]
+    const ALIGN = ALIGN<T>[{impl SizedTypeProperties for T}<T>[TraitClause0]]
+    const ALIGNMENT = ALIGNMENT<T>[{impl SizedTypeProperties for T}<T>[TraitClause0]]
+    const IS_ZST = IS_ZST<T>[{impl SizedTypeProperties for T}<T>[TraitClause0]]
+    const LAYOUT = LAYOUT<T>[{impl SizedTypeProperties for T}<T>[TraitClause0]]
+    const MAX_SLICE_LEN = MAX_SLICE_LEN<T>[{impl SizedTypeProperties for T}<T>[TraitClause0]]
     non-dyn-compatible
 }
 
@@ -151,7 +151,7 @@ fn precondition_check(this_1: *const (), count_2: isize, size_3: usize)
     let count_2: isize; // arg #2
     let size_3: usize; // arg #3
     let _4: bool; // anonymous local
-    let msg_5: &'1 Str; // local
+    let msg_5: &'1 str; // local
     let _6: !; // anonymous local
     let _7: Arguments<'3>; // anonymous local
     let rhs_8: isize; // local
@@ -176,7 +176,7 @@ fn precondition_check(this_1: *const (), count_2: isize, size_3: usize)
     let _27: usize; // anonymous local
     let _28: usize; // anonymous local
     let _29: usize; // anonymous local
-    let _30: *const Str; // anonymous local
+    let _30: *const str; // anonymous local
     let _31: &'8 [u8]; // anonymous local
 
     storage_live(msg_5)
@@ -189,7 +189,6 @@ fn precondition_check(this_1: *const (), count_2: isize, size_3: usize)
     storage_live(rhs_8)
     rhs_8 = cast<usize, isize>(copy size_3)
     storage_live(b_11)
-    storage_live(_10)
     storage_live(_12)
     storage_live(_13)
     _13 = cast<isize, i64>(copy count_2)
@@ -198,6 +197,7 @@ fn precondition_check(this_1: *const (), count_2: isize, size_3: usize)
     _12 = move _13 checked.* move _14
     storage_dead(_14)
     storage_dead(_13)
+    storage_live(_10)
     _10 = copy _12.0
     b_11 = copy _12.1
     storage_dead(_12)
@@ -247,7 +247,7 @@ fn precondition_check(this_1: *const (), count_2: isize, size_3: usize)
     storage_live(_25)
     storage_live(_30)
     _30 = &raw const (*msg_5) with_metadata(copy msg_5.metadata)
-    _25 = cast<*const Str, *const u8>(copy _30)
+    _25 = cast<*const str, *const u8>(copy _30)
     storage_dead(_30)
     _24 = transmute<*const u8, NonNull<u8>>(copy _25)
     storage_dead(_25)
@@ -256,7 +256,7 @@ fn precondition_check(this_1: *const (), count_2: isize, size_3: usize)
     storage_live(_28)
     storage_live(_29)
     storage_live(_31)
-    _31 = transmute<&'11 Str, &'10 [u8]>(const "unsafe precondition(s) violated: ptr::offset requires the address calculation to not overflow\n\nThis indicates a bug in the program. This Undefined Behavior check is optional, and cannot be relied on for safety.")
+    _31 = transmute<&'11 str, &'10 [u8]>(const "unsafe precondition(s) violated: ptr::offset requires the address calculation to not overflow\n\nThis indicates a bug in the program. This Undefined Behavior check is optional, and cannot be relied on for safety.")
     _29 = copy _31.metadata
     storage_dead(_31)
     _28 = move _29 wrap.<< const 1 : i32
@@ -274,7 +274,7 @@ fn precondition_check(this_1: *const (), count_2: isize, size_3: usize)
 // Full name: core::ptr::const_ptr::{*const T}::offset
 pub unsafe fn offset<T>(self_1: *const T, count_2: isize) -> *const T
 where
-    [@TraitClause0]: Sized<T>,
+    TraitClause0: (T: Sized),
 {
     let _0: *const T; // return
     let self_1: *const T; // arg #1
@@ -289,7 +289,7 @@ where
     if move _5 {
         storage_live(_4)
         _4 = cast<*const T, *const ()>(copy self_1)
-        _3 = precondition_check(move _4, copy count_2, const {impl SizedTypeProperties for T}<T>[@TraitClause0]::SIZE)
+        _3 = precondition_check(move _4, copy count_2, const {impl SizedTypeProperties for T}<T>[TraitClause0]::SIZE)
         storage_dead(_4)
     } else {
     }
@@ -300,20 +300,8 @@ where
 // Full name: core::slice::{[T]}::as_ptr
 pub fn as_ptr<'_0, T>(_1: &'_0 [T]) -> *const T
 where
-    [@TraitClause0]: Sized<T>,
+    TraitClause0: (T: Sized),
 = <opaque>
-
-// Full name: UNIT_METADATA
-fn UNIT_METADATA()
-{
-    let _0: (); // return
-
-    _0 = ()
-    return
-}
-
-// Full name: UNIT_METADATA
-const UNIT_METADATA: () = UNIT_METADATA()
 
 // Full name: test_crate::main
 fn main()

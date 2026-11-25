@@ -4,8 +4,8 @@
 #[lang_item("ptr_null")]
 pub fn null<T>() -> *const T
 where
-    [@TraitClause0]: Thin<T>,
-    [@TraitClause1]: Destruct<T>,
+    TraitClause0: (T: Thin),
+    TraitClause1: (T: Destruct),
 {
     let _0: *const T; // return
     let _1: *const T; // anonymous local

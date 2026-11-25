@@ -34,7 +34,7 @@
 //! ```
 
 use crate::transform::TransformCtx;
-use crate::transform::ctx::{BodyTransformCtx, FusedUllbcPass};
+use crate::transform::ctx::{BodyTransformCtx, UllbcPass};
 use crate::ullbc_ast::*;
 
 fn contains_index_proj<T: BodyVisitable>(x: &T) -> bool {
@@ -62,7 +62,7 @@ impl Rvalue {
 
 pub struct Transform;
 
-impl FusedUllbcPass for Transform {
+impl UllbcPass for Transform {
     fn transform_function(&self, ctx: &mut TransformCtx, decl: &mut FunDecl) {
         decl.transform_ullbc_statements(ctx, |ctx, st: &mut Statement| {
             // Introduce an intermediate statement if both the rhs and the lhs contain an
@@ -74,7 +74,10 @@ impl FusedUllbcPass for Transform {
             {
                 // Fresh local variable for the temporary assignment
                 let tmp_var = ctx.fresh_var(None, lhs.ty().clone());
-                let tmp_rhs = std::mem::replace(rhs, Rvalue::Use(Operand::Move(tmp_var.clone())));
+                let tmp_rhs = std::mem::replace(
+                    rhs,
+                    Rvalue::Use(Operand::Move(tmp_var.clone()), WithRetag::No),
+                );
                 // Introduce the intermediate let-binding
                 ctx.insert_assn_stmt(tmp_var, tmp_rhs)
             }

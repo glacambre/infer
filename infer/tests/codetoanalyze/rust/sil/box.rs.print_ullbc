@@ -25,22 +25,12 @@ impl Destruct for Global {
     non-dyn-compatible
 }
 
-// Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop_in_place
-unsafe fn {impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop_in_place<T, A>(_1: *mut alloc::boxed::Box<T>[@TraitClause0, @TraitClause1])
+// Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place
+unsafe fn {impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place<T, A>(_1: *mut alloc::boxed::Box<T>[TraitClause0, TraitClause1])
 where
-    [@TraitClause0]: Destruct<T>,
-    [@TraitClause1]: Destruct<A>,
+    TraitClause0: (T: Destruct),
+    TraitClause1: (A: Destruct),
 = <opaque>
-
-// Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}
-impl<T, A> Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: Destruct<T>,
-    [@TraitClause1]: Destruct<A>,
-{
-    fn drop_in_place = {impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop_in_place<T, A>[@TraitClause0, @TraitClause1]
-    non-dyn-compatible
-}
 
 // Full name: box::main
 fn main()
@@ -60,7 +50,7 @@ fn main()
 
     bb2: {
         _0 = ();
-        drop[{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<i32, Global>[{built_in impl Destruct for i32}, {impl Destruct for Global}]] b_1 -> bb3 (unwind: bb4);
+        drop[{impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place<i32, Global>[{built_in impl Destruct for i32}, {impl Destruct for Global}]] b_1 -> bb3 (unwind: bb4);
     }
 
     bb3: {

@@ -15,12 +15,12 @@ unsafe fn core::marker::Destruct::drop_in_place<Self>(_1: *mut Self)
 #[lang_item("NonNull")]
 pub opaque type NonNull<T>
 where
-    [@TraitClause0]: Destruct<T>,
+    TraitClause0: (T: Destruct),
 
 // Full name: core::ptr::unique::Unique
 pub opaque type Unique<T>
 where
-    [@TraitClause0]: Destruct<T>,
+    TraitClause0: (T: Destruct),
 
 // Full name: alloc::alloc::Global
 #[lang_item("global_alloc_ty")]
@@ -36,36 +36,12 @@ impl Destruct for Global {
     non-dyn-compatible
 }
 
-// Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop_in_place
-unsafe fn {impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop_in_place<T, A>(_1: *mut alloc::boxed::Box<T>[@TraitClause0, @TraitClause1])
+// Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place
+unsafe fn {impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place<T, A>(_1: *mut alloc::boxed::Box<T>[TraitClause0, TraitClause1])
 where
-    [@TraitClause0]: Destruct<T>,
-    [@TraitClause1]: Destruct<A>,
+    TraitClause0: (T: Destruct),
+    TraitClause1: (A: Destruct),
 = <opaque>
-
-// Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}
-impl<T, A> Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: Destruct<T>,
-    [@TraitClause1]: Destruct<A>,
-{
-    fn drop_in_place = {impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop_in_place<T, A>[@TraitClause0, @TraitClause1]
-    non-dyn-compatible
-}
-
-// Full name: UNIT_METADATA
-fn UNIT_METADATA()
-{
-    let _0: (); // return
-
-    bb0: {
-        _0 = ();
-        return;
-    }
-}
-
-// Full name: UNIT_METADATA
-const UNIT_METADATA: () = UNIT_METADATA()
 
 // Full name: box_free::main
 fn main()
@@ -100,7 +76,7 @@ fn main()
         storage_dead(_3);
         storage_dead(_4);
         // Box is freed here since borrowchecker does not keep track of raw pointer
-        drop[{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<i32, Global>[{built_in impl Destruct for i32}, {impl Destruct for Global}]] x_2 -> bb3 (unwind: bb4);
+        drop[{impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place<i32, Global>[{built_in impl Destruct for i32}, {impl Destruct for Global}]] x_2 -> bb3 (unwind: bb4);
     }
 
     bb3: {

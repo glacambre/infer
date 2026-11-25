@@ -5,7 +5,7 @@
 pub opaque type Arguments<'a>
 
 // Full name: core::fmt::{Arguments<'a>}::from_str
-pub fn from_str<'a>(_1: &'static Str) -> Arguments<'a>
+pub fn from_str<'a>(_1: &'static str) -> Arguments<'a>
 = <opaque>
 
 // Full name: core::marker::MetaSized
@@ -27,33 +27,19 @@ unsafe fn core::marker::Destruct::drop_in_place<Self>(_1: *mut Self)
 #[lang_item("drop")]
 pub trait Drop<Self>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    proof ImpliedClause0: (Self: MetaSized)
     fn drop<'_0_1> = core::ops::drop::Drop::drop<'_0_1, Self>[Self]
     vtable: core::ops::drop::Drop::{vtable}
 }
 
 pub fn core::ops::drop::Drop::drop<'_0, Self>(_1: &'_0 mut Self)
 where
-    [@TraitClause0]: Drop<Self>,
+    TraitClause0: (Self: Drop),
 = <opaque>
 
 // Full name: std::io::stdio::_print
 pub fn _print<'_0>(_1: Arguments<'_0>)
 = <opaque>
-
-// Full name: UNIT_METADATA
-fn UNIT_METADATA()
-{
-    let _0: (); // return
-
-    bb0: {
-        _0 = ();
-        return;
-    }
-}
-
-// Full name: UNIT_METADATA
-const UNIT_METADATA: () = UNIT_METADATA()
 
 // Full name: test_crate::Foo
 struct Foo {}
@@ -93,19 +79,16 @@ pub fn {impl Drop for Foo}::drop<'_0>(self_1: &'_0 mut Foo)
 unsafe fn {impl Destruct for Foo}::drop_in_place(_1: *mut Foo)
 {
     let _0: (); // return
-    let _1: *mut Foo; // arg #1
-    let _2: &'1 mut Foo; // anonymous local
-    let _3: &'2 mut Foo; // anonymous local
-    let _4: (); // anonymous local
+    let _1: &'1 mut Foo; // arg #1
+    let _2: &'2 mut Foo; // anonymous local
+    let _3: (); // anonymous local
 
     bb0: {
         storage_live(_2);
         storage_live(_3);
-        storage_live(_4);
         _0 = ();
         _2 = &mut (*_1);
-        _3 = &mut (*_2);
-        _4 = {impl Drop for Foo}::drop<'4>(move _3) -> bb2 (unwind: bb1);
+        _3 = {impl Drop for Foo}::drop<'4>(move _2) -> bb2 (unwind: bb1);
     }
 
     bb1: {
@@ -125,7 +108,7 @@ impl Destruct for Foo {
 
 // Full name: test_crate::{impl Drop for Foo}
 impl Drop for Foo {
-    parent_clause0 = {built_in impl MetaSized for Foo}
+    proof ImpliedClause0: (Foo: MetaSized) = {built_in impl MetaSized for Foo}
     fn drop<'_0_1> = {impl Drop for Foo}::drop<'_0_1>
     vtable: {impl Drop for Foo}::{vtable}
 }
@@ -150,7 +133,7 @@ fn main()
     }
 
     bb1: {
-        conditional_drop[{impl Destruct for Foo}] f_1 -> bb3 (unwind: bb4);
+        conditional_drop[{impl Destruct for Foo}::drop_in_place] f_1 -> bb3 (unwind: bb4);
     }
 
     bb2: {
@@ -160,7 +143,7 @@ fn main()
         f_ref_4 = &f_1;
         _0 = ();
         storage_dead(f_ref_4);
-        conditional_drop[{impl Destruct for Foo}] f_1 -> bb5 (unwind: bb3);
+        conditional_drop[{impl Destruct for Foo}::drop_in_place] f_1 -> bb5 (unwind: bb3);
     }
 
     bb3: {

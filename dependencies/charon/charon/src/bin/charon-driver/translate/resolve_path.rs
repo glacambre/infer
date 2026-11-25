@@ -120,7 +120,7 @@ pub fn def_path_def_ids<'a, 'tcx>(
                                     items = impls
                                         .filter(|impl_def_id| {
                                             let impl_self_ty = tcx
-                                                .impl_trait_ref(impl_def_id)
+                                                .impl_trait_ref(*impl_def_id)
                                                 .skip_binder()
                                                 .self_ty();
                                             if let ty::Adt(adt_def, _) = impl_self_ty.kind() {
@@ -147,19 +147,19 @@ pub fn def_path_def_ids<'a, 'tcx>(
             }
         } else {
             let nameable_children = items.iter().copied().flat_map(|def_id| {
-                let hax_def: Arc<hax::FullDef> = def_id.sinto(s).full_def(s);
+                let hax_def: Arc<hax::FullDef<'tcx>> = def_id.sinto(s).full_def(s);
                 hax_def.nameable_children(s)
             });
             match elem {
                 PatElem::Ident { name: elem, .. } => {
                     items = nameable_children
                         .filter(|(child_name, _)| child_name.as_str() == elem)
-                        .filter_map(|(_, def_id)| def_id.as_rust_def_id())
+                        .filter_map(|(_, def_id)| def_id.as_real_def_id())
                         .collect();
                 }
                 PatElem::Glob => {
                     items = nameable_children
-                        .filter_map(|(_, def_id)| def_id.as_rust_def_id())
+                        .filter_map(|(_, def_id)| def_id.as_real_def_id())
                         .collect();
                 }
                 PatElem::Impl(_) => bail!(

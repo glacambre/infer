@@ -1,19 +1,5 @@
 # Final ULLBC before serialization:
 
-// Full name: UNIT_METADATA
-fn UNIT_METADATA()
-{
-    let _0: (); // return
-
-    bb0: {
-        _0 = ();
-        return;
-    }
-}
-
-// Full name: UNIT_METADATA
-const UNIT_METADATA: () = UNIT_METADATA()
-
 // Full name: call_disjoint_ok::write
 fn write<'_0>(a_1: &'_0 mut i32)
 {

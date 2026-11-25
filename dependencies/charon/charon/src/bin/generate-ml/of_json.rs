@@ -138,6 +138,7 @@ impl<'a> GenerateCtx<'a> {
                 for ty in &tref.generics.types {
                     expr.push(self.type_to_ocaml_call(ty))
                 }
+                let mut wrap_in_map = false;
                 match tref.id {
                     TypeId::Adt(id) => {
                         let mut first = if let Some(tdecl) = self.crate_data.type_decls.get(id) {
@@ -163,8 +164,9 @@ impl<'a> GenerateCtx<'a> {
                             expr[2] = "int_of_json".to_string();
                         }
 
-                        if first == "indexed_map" && self.use_opt_index_map() {
-                            first = format!("opt_{first}");
+                        if first == "indexed_map" {
+                            wrap_in_map = true;
+                            first = "opt_indexed_map".to_string();
                         }
 
                         expr.insert(0, first + "_of_json");
@@ -180,7 +182,14 @@ impl<'a> GenerateCtx<'a> {
                     }
                     _ => unimplemented!("{ty:?}"),
                 }
-                expr.into_iter().map(|f| format!("({f})")).join(" ")
+                let mut expr = expr.into_iter().map(|f| format!("({f})")).join(" ");
+                if wrap_in_map {
+                    let index_name = self.type_to_rust_name(&tref.generics.types[0]).unwrap();
+                    expr = format!(
+                        "(fun ctx json -> Result.map {index_name}.map_of_indexed_list ({expr} ctx json))"
+                    );
+                }
+                expr
             }
             TyKind::TypeVar(DeBruijnVar::Free(id)) => format!("arg{id}_of_json"),
             _ => unimplemented!("{ty:?}"),
@@ -234,7 +243,7 @@ impl<'a> GenerateCtx<'a> {
                     && fields[0].name.as_ref().is_some_and(|name| name == "_raw") =>
             {
                 // These are the special strongly-typed integers.
-                let short_name = decl.item_meta.name.short_str();
+                let short_name = decl.item_meta.name.short_str().unwrap();
                 format!("| x -> {short_name}.id_of_json ctx x")
             }
             TypeDeclKind::Struct(fields)
@@ -245,8 +254,7 @@ impl<'a> GenerateCtx<'a> {
                             .attr_info
                             .attributes
                             .iter()
-                            .filter_map(|a| a.as_unknown())
-                            .any(|a| a.to_string() == "serde(transparent)")) =>
+                            .any(|a| a.is_transparent())) =>
             {
                 let ty = &fields[0].ty;
                 let call = self.type_to_ocaml_call(ty);
@@ -276,17 +284,6 @@ impl<'a> GenerateCtx<'a> {
                 self.build_branch(&pat, &fields, &construct)
             }
             TypeDeclKind::Struct(fields) => {
-                let fields = fields
-                    .iter()
-                    .filter(|field| {
-                        !field
-                            .attr_info
-                            .attributes
-                            .iter()
-                            .filter_map(|a| a.as_unknown())
-                            .any(|a| a.to_string() == "serde(skip)")
-                    })
-                    .collect_vec();
                 let pat: String = fields
                     .iter()
                     .map(|f| {
@@ -375,11 +372,7 @@ impl<'a> GenerateCtx<'a> {
         let manual_impls = self.names_to_type_id_map(MANUAL_IMPLS);
         let fns = tys
             .iter()
-            .map(|ty| {
-                self.with_item(ty, |ctx| {
-                    ctx.type_decl_to_json_deserializer(&manual_impls, ty)
-                })
-            })
+            .map(|ty| self.type_decl_to_json_deserializer(&manual_impls, ty))
             .format("\n");
         format!("let rec ___ = ()\n{fns}")
     }

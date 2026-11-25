@@ -8,7 +8,7 @@ pub trait MetaSized<Self>
 #[lang_item("sized")]
 pub trait Sized<Self>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    proof ImpliedClause0: (Self: MetaSized)
     non-dyn-compatible
 }
 
@@ -16,7 +16,7 @@ pub trait Sized<Self>
 #[lang_item("Default")]
 pub trait Default<Self>
 {
-    parent_clause0 : [@TraitClause0]: Sized<Self>
+    proof ImpliedClause0: (Self: Sized)
     fn default = core::default::Default::default<Self>[Self]
     non-dyn-compatible
 }
@@ -24,7 +24,7 @@ pub trait Default<Self>
 #[lang_item("default_fn")]
 pub fn core::default::Default::default<Self>() -> Self
 where
-    [@TraitClause0]: Default<Self>,
+    TraitClause0: (Self: Default),
 = <opaque>
 
 // Full name: core::default::{impl Default for u32}::default
@@ -51,7 +51,7 @@ unsafe fn drop_in_place<Self>(_1: *mut Self)
 #[lang_item("Option")]
 pub enum Option<T>
 where
-    [@TraitClause0]: Sized<T>,
+    TraitClause0: (T: Sized),
 {
   None,
   Some(T),
@@ -68,20 +68,8 @@ pub enum AssertKind {
 #[lang_item("slice_len_fn")]
 pub fn len<'_0, T>(_1: &'_0 [T]) -> usize
 where
-    [@TraitClause0]: Sized<T>,
+    TraitClause0: (T: Sized),
 = <opaque>
-
-// Full name: UNIT_METADATA
-fn UNIT_METADATA()
-{
-    let _0: (); // return
-
-    _0 = ()
-    return
-}
-
-// Full name: UNIT_METADATA
-const UNIT_METADATA: () = UNIT_METADATA()
 
 // Full name: test_crate::function_call
 fn function_call(_1: u32)
@@ -254,7 +242,7 @@ pub fn {impl Default for Foo}::default() -> Foo
 
 // Full name: test_crate::{impl Default for Foo}
 impl Default for Foo {
-    parent_clause0 = {built_in impl Sized for Foo}
+    proof ImpliedClause0: (Foo: Sized) = {built_in impl Sized for Foo}
     fn default = {impl Default for Foo}::default
     non-dyn-compatible
 }
@@ -284,7 +272,7 @@ pub fn {impl Default for Bar}::default() -> Bar
 
 // Full name: test_crate::{impl Default for Bar}
 impl Default for Bar {
-    parent_clause0 = {built_in impl Sized for Bar}
+    proof ImpliedClause0: (Bar: Sized) = {built_in impl Sized for Bar}
     fn default = {impl Default for Bar}::default
     non-dyn-compatible
 }
@@ -292,14 +280,14 @@ impl Default for Bar {
 // Full name: test_crate::eat
 fn eat<T>(_1: T)
 where
-    [@TraitClause0]: Sized<T>,
+    TraitClause0: (T: Sized),
 {
     let _0: (); // return
     let _1: T; // arg #1
 
     _0 = ()
     _0 = ()
-    conditional_drop[{built_in impl Destruct for T}] _1
+    conditional_drop[{built_in impl Destruct for T}::drop_in_place] _1
     return
 }
 
@@ -339,10 +327,11 @@ fn foo()
     let _30: &'12 u32; // anonymous local
     let _31: Option<Arguments<'19>>[{built_in impl Sized for Arguments<'19>}]; // anonymous local
     let _32: &'22 u32; // anonymous local
-    let _33: &'31 u32; // anonymous local
-    let _34: u32; // anonymous local
-    let _35: &'_ [u32; 10 : usize]; // anonymous local
-    let _36: &'_ u32; // anonymous local
+    let _33: &'23 u32; // anonymous local
+    let _34: &'31 u32; // anonymous local
+    let _35: u32; // anonymous local
+    let _36: &'_ [u32; 10 : usize]; // anonymous local
+    let _37: &'_ u32; // anonymous local
 
     storage_live(_32)
     _0 = ()
@@ -400,13 +389,15 @@ fn foo()
     _18 = const 9 : usize
     storage_live(_33)
     storage_live(_34)
-    _34 = const 9 : u32
-    _33 = &_34
     storage_live(_35)
-    _35 = &a_15
+    _35 = const 9 : u32
+    _34 = &_35
+    _33 = move _34
     storage_live(_36)
-    _36 = @ArrayIndexShared<'_, u32, 10 : usize>(move _35, copy _18)
-    _17 = &(*_36)
+    _36 = &a_15
+    storage_live(_37)
+    _37 = @ArrayIndexShared<'_, u32, 10 : usize>(move _36, copy _18)
+    _17 = &(*_37)
     storage_live(_19)
     _32 = move _33
     _19 = &(*_32)
@@ -517,7 +508,7 @@ pub fn fake_read(x_1: u32)
 fn fool()
 {
     let _0: (); // return
-    let _1: &'1 Str; // anonymous local
+    let _1: &'1 str; // anonymous local
 
     _0 = ()
     storage_live(_1)

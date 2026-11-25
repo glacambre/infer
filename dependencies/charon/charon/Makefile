@@ -11,7 +11,15 @@ format:
 
 .PHONY: test
 test:
+	$(MAKE) test
+	$(MAKE) clippy
+
+.PHONY: test-noclippy
+test-noclippy:
 	cargo test
+
+.PHONY: clippy
+clippy:
 	cargo clippy --all-targets --fix --allow-dirty
 
 .PHONY: test-popular-crates
@@ -28,6 +36,8 @@ doc:
 .PHONY: clean-generated
 clean-generated:
 	find tests -name '*.llbc' -delete
+	find tests -name '*.ullbc' -delete
+	find tests -name '*.postcard' -delete
 
 .PHONY: clean
 clean: clean-generated

@@ -1,6 +1,14 @@
 //! Trait elaboration: given a trait reference, we track which impl and/or local clauses caused it to be true.
 #![feature(rustc_private)]
+#![allow(
+    clippy::derivable_impls,
+    clippy::len_without_is_empty,
+    clippy::new_without_default,
+    clippy::should_implement_trait
+)]
 
+extern crate rustc_arena;
+extern crate rustc_data_structures;
 extern crate rustc_hir;
 extern crate rustc_infer;
 extern crate rustc_middle;
@@ -8,18 +16,25 @@ extern crate rustc_span;
 extern crate rustc_trait_selection;
 extern crate rustc_type_ir;
 
+mod ctx;
 mod elaboration;
+mod item_ref;
 mod predicates;
 mod utils;
 
+pub use ctx::*;
 pub use elaboration::*;
+pub use item_ref::*;
 pub use predicates::*;
 pub use utils::*;
 
+use rustc_data_structures::intern::Interned;
 use rustc_hir::def_id::DefId;
 use rustc_middle::ty;
+use std::hash::Hash;
+use std::ops::Deref;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum DestructData<'tcx> {
     /// A drop that does nothing, e.g. for scalars and pointers.
     Noop,
@@ -35,56 +50,41 @@ pub enum DestructData<'tcx> {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum BuiltinTraitData<'tcx> {
     /// A virtual `Destruct` implementation.
     /// `Destruct` is implemented automatically for all types. For our purposes, we chose to attach
     /// the information about `drop_in_place` to that trait. This data tells us what kind of
     /// `drop_in_place` the target type has.
     Destruct(DestructData<'tcx>),
+    /// An auto-trait.
+    Auto,
     /// Some other builtin trait.
+    // FIXME: carry the SolverTraitLangItem here directly
     Other,
 }
 
-#[derive(Debug, Clone)]
-pub enum PathChunk<'tcx> {
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum ImpliedPredicate<'tcx> {
     AssocItem {
-        item: ty::AssocItem,
-        /// The arguments provided to the item (for GATs). Includes trait args.
-        generic_args: ty::GenericArgsRef<'tcx>,
-        /// The implemented predicate.
-        predicate: ty::PolyTraitRef<'tcx>,
-        /// The index of this predicate in the list returned by `ItemPredicates::Implied`.
+        item: ItemRef<'tcx>,
+        /// The index of this predicate among the trait predicates returned by `ItemPredicates::Implied`.
         index: usize,
     },
     Parent {
-        /// The implemented predicate.
-        predicate: ty::PolyTraitRef<'tcx>,
-        /// The index of this predicate in the list returned by `ItemPredicates::Implied`.
+        /// The index of this predicate among the trait predicates returned by `ItemPredicates::Implied`.
         index: usize,
     },
 }
-pub type Path<'tcx> = Vec<PathChunk<'tcx>>;
 
-#[derive(Debug, Clone)]
-pub enum ImplExprAtom<'tcx> {
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum TraitProofKind<'tcx> {
     /// A concrete `impl Trait for Type {}` item.
-    Concrete {
-        def_id: DefId,
-        generics: ty::GenericArgsRef<'tcx>,
-    },
+    Concrete(ItemRef<'tcx>),
     /// A context-bound clause like `where T: Trait`.
-    LocalBound {
-        predicate: ty::Predicate<'tcx>,
-        id: ItemPredicateId,
-        r#trait: ty::PolyTraitRef<'tcx>,
-        path: Path<'tcx>,
-    },
+    LocalBound(ItemPredicateId),
     /// The automatic clause `Self: Trait` present inside a `impl Trait for Type {}` item.
-    SelfImpl {
-        r#trait: ty::PolyTraitRef<'tcx>,
-        path: Path<'tcx>,
-    },
+    SelfProof,
     /// `dyn Trait` is a wrapped value with a virtual table for trait
     /// `Trait`.  In other words, a value `dyn Trait` is a dependent
     /// triple that gathers a type τ, a value of type τ and an
@@ -98,21 +98,44 @@ pub enum ImplExprAtom<'tcx> {
     Builtin {
         /// Extra data for the given trait.
         trait_data: BuiltinTraitData<'tcx>,
-        /// The `ImplExpr`s required to satisfy the implied predicates on the trait declaration.
-        /// E.g. since `FnMut: FnOnce`, a built-in `T: FnMut` impl would have an `ImplExpr` for `T:
-        /// FnOnce`.
-        impl_exprs: Vec<ImplExpr<'tcx>>,
+        /// The trait proofs required to satisfy the implied predicates on the trait declaration.
+        /// E.g. since `FnMut: FnOnce`, a built-in `T: FnMut` impl would have a proof for
+        /// `T: FnOnce`.
+        proofs: Vec<TraitProof<'tcx>>,
         /// The values of the associated types for this trait.
-        types: Vec<(DefId, ty::Ty<'tcx>, Vec<ImplExpr<'tcx>>)>,
+        types: Vec<(DefId, ty::Ty<'tcx>, Vec<TraitProof<'tcx>>)>,
+    },
+    /// A predicate implied by `base` by following `path`.
+    Derived {
+        base: TraitProof<'tcx>,
+        path: ImpliedPredicate<'tcx>,
     },
     /// An error happened while elaborating traits.
     Error(String),
 }
 
-#[derive(Clone, Debug)]
-pub struct ImplExpr<'tcx> {
-    /// The trait this is an impl for.
-    pub r#trait: ty::PolyTraitRef<'tcx>,
-    /// The kind of implemention of the root of the tree.
-    pub r#impl: ImplExprAtom<'tcx>,
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct TraitProofContents<'tcx> {
+    /// The trait predicate this is a proof for.
+    pub pred: ty::PolyTraitRef<'tcx>,
+    /// The proof.
+    pub kind: TraitProofKind<'tcx>,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub struct TraitProof<'tcx> {
+    contents: Interned<'tcx, TraitProofContents<'tcx>>,
+}
+
+impl<'tcx> TraitProof<'tcx> {
+    pub fn contents(&self) -> &TraitProofContents<'tcx> {
+        &self.contents
+    }
+}
+
+impl<'tcx> Deref for TraitProof<'tcx> {
+    type Target = TraitProofContents<'tcx>;
+    fn deref(&self) -> &Self::Target {
+        &self.contents
+    }
 }

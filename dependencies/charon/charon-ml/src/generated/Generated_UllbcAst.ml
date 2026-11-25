@@ -82,7 +82,7 @@ and terminator_kind =
           - [call]
           - [target]
           - [on_unwind] *)
-  | Drop of drop_kind * place * trait_ref * block_id * block_id
+  | Drop of drop_kind * place * fn_ptr * block_id * block_id
       (** Drop the value at the given place.
 
           Depending on [DropKind], this may be a real call to [drop_in_place],
@@ -93,7 +93,7 @@ and terminator_kind =
           Fields:
           - [kind]
           - [place]
-          - [tref]
+          - [fn_ptr]: Reference to the [drop_in_place] code to call on drop.
           - [target]
           - [on_unwind] *)
   | TAssert of assertion * block_id * block_id
@@ -103,6 +103,14 @@ and terminator_kind =
           Fields:
           - [assert]
           - [target]
+          - [on_unwind] *)
+  | InlineAsm of string * block_id list * block_id
+      (** An inline assembly block. For now we only preserve the template
+          string.
+
+          Fields:
+          - [asm]
+          - [targets]
           - [on_unwind] *)
   | Abort of abort_kind  (** Handles panics and impossible cases. *)
   | Return

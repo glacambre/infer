@@ -245,7 +245,7 @@ and projection_elem =
     the aggregate kind to operands TODO: we should prefix the type variants with
     "R" or "Rv", this would avoid collisions *)
 and rvalue =
-  | Use of operand  (** Lifts an operand as an rvalue. *)
+  | Use of operand * with_retag  (** Lifts an operand as an rvalue. *)
   | RvRef of place * borrow_kind * operand
       (** Takes a reference to the given place. The [Operand] refers to the init
           value of the metadata, it is [()] if no metadata
@@ -273,8 +273,8 @@ and rvalue =
       (** Discriminant read. Reads the discriminant value of an enum. The place
           must have the type of an enum. The discriminant in question is the one
           in the [discriminant] field of the corresponding [Variant]. This can
-          be different than the value stored in memory (called [tag]). That one
-          is described by [[DiscriminantLayout]] and [[TagEncoding]]. *)
+          be different than the value stored in memory (called [tag]); that one
+          is described by [[Discriminator]] and [[VariantLayout::tagger]]. *)
   | Aggregate of aggregate_kind * operand list
       (** Creates an aggregate value, like a tuple, a struct or an enum:
           {@rust[
@@ -310,11 +310,6 @@ and rvalue =
       (** [Repeat(x, n)] creates an array where [x] is copied [n] times.
 
           We translate this to a function call for LLBC. *)
-  | ShallowInitBox of operand * ty
-      (** Transmutes a [*mut u8] (obtained from [malloc]) into
-          shallow-initialized [Box<T>]. This only appears as part of lowering
-          [Box::new()] in some cases. We reconstruct the original [Box::new()]
-          call, but sometimes may fail to do so, leaking the expression. *)
 
 (** Unary operation *)
 and unop =
@@ -322,6 +317,10 @@ and unop =
   | Neg of overflow_mode  (** This can overflow, for [-i::MIN]. *)
   | Cast of cast_kind
       (** Casts are rvalues in MIR, but we treat them as unops. *)
+
+(** Used for [[Rvalue::Use]] to indicate whether the operand should be retagged
+    (this is used for Rust's aliasing model). *)
+and with_retag = NoRetag | YesRetag
 [@@deriving
   show,
   eq,

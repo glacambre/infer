@@ -9,6 +9,12 @@ open! IStd
 module L = Logging
 module PlaceMap = Stdlib.Map.Make (Int)
 
+(* Charon prints an item by its short name when that name is unique in the crate. Print full names
+   instead, so that adding an unrelated item with the same short name does not rename procedures. *)
+let fmt_env (crate : Charon.UllbcAst.crate) =
+  Charon.Print.crate_to_fmt_env {crate with short_names= []}
+
+
 let fun_map_find_id (crate : Charon.UllbcAst.crate) fun_decl_id =
   let decl = Charon.Types.FunDeclId.Map.find_opt fun_decl_id crate.fun_decls in
   match decl with
@@ -16,7 +22,7 @@ let fun_map_find_id (crate : Charon.UllbcAst.crate) fun_decl_id =
       decl
   | None ->
       L.die UserError "[ERROR] Unsupported fun type (fun_decl_id not found): @. > %s @."
-        (Charon.Print.fun_decl_id_to_string (Charon.Print.crate_to_fmt_env crate) fun_decl_id)
+        (Charon.Print.fun_decl_id_to_string (fmt_env crate) fun_decl_id)
 
 
 let type_decl_map_find_id (crate : Charon.UllbcAst.crate) type_decl_id =
@@ -27,7 +33,7 @@ let type_decl_map_find_id (crate : Charon.UllbcAst.crate) type_decl_id =
   | None ->
       L.die UserError
         "[ERROR] Unsupported adt_typ_to_textual type (type_decl_ref not found): @. > %s @."
-        (Charon.Print.type_decl_id_to_string (Charon.Print.crate_to_fmt_env crate) type_decl_id)
+        (Charon.Print.type_decl_id_to_string (fmt_env crate) type_decl_id)
 
 
 let global_decl_map_find_id (crate : Charon.UllbcAst.crate) global_decl_id =
@@ -37,7 +43,7 @@ let global_decl_map_find_id (crate : Charon.UllbcAst.crate) global_decl_id =
       decl
   | None ->
       L.die UserError "[ERROR] Unsupported global type (global_decls not found): @. > %s @."
-        (Charon.Print.global_decl_id_to_string (Charon.Print.crate_to_fmt_env crate) global_decl_id)
+        (Charon.Print.global_decl_id_to_string (fmt_env crate) global_decl_id)
 
 
 let location_from_span (span : Charon.Generated_Meta.span) : Textual.Location.t =
@@ -53,7 +59,7 @@ let location_from_span_end (span : Charon.Generated_Meta.span) : Textual.Locatio
 
 
 let name_of_path_element crate (path_element : Charon.Generated_Types.path_elem) : string =
-  Charon.Print.path_elem_to_string (Charon.Print.crate_to_fmt_env crate) path_element
+  Charon.Print.path_elem_to_string (fmt_env crate) path_element
 
 
 let name_of_field (field : Charon.Generated_Types.field) (field_id : int) : Textual.FieldName.t =
@@ -372,6 +378,9 @@ and ty_to_textual_typ crate (rust_ty : Charon.Generated_Types.ty) : Textual.Typ.
   | TFnDef _ ->
       (* TODO Types *)
       Textual.Typ.Fun None
+  | TPattern (ty, _) ->
+      (* Pattern types refine the values of their underlying type without changing its layout. *)
+      ty_to_textual_typ crate ty
   | TArray (ty, _size_exp) ->
       Textual.Typ.Array (ty_to_textual_typ crate ty)
   | TSlice ty ->
@@ -602,7 +611,7 @@ let mk_exp_from_rvalue ~loc crate (rvalue : Charon.Generated_Expressions.rvalue)
       | _ ->
           L.die UserError "[ERROR] Unsupported aggregate type: @. > %a @."
             Charon.Generated_Expressions.pp_rvalue rvalue )
-  | Use op ->
+  | Use (op, _) ->
       mk_exp_from_operand ~loc crate place_map op
   | Discriminant place ->
       let exp = mk_exp_from_place ~loc crate place_map place in
@@ -770,9 +779,9 @@ let mk_field_store_instrs_from_rvalues ~loc crate lexp enclosing_class place_map
   |> List.mapi ~f:(mk_field_store_instr_from_rvalue ~loc crate lexp enclosing_class place_map)
 
 
-let mk_retag_instrs ~loc (rhs : Charon.Generated_Expressions.rvalue) ~(dst : Textual.Exp.t)
-    ~(borrowed : Textual.Exp.t) : Textual.Instr.t list =
-  let mk_retag ~is_mut =
+let mk_retag_instrs ~loc (rhs : Charon.Generated_Expressions.rvalue) ~(ty : Charon.Types.ty) ~typ
+    ~(dst : Textual.Exp.t) ~(borrowed : Textual.Exp.t) : Textual.Instr.t list =
+  let mk_retag ~borrowed ~is_mut =
     let bool_exp b = Textual.Exp.Const (Textual.Const.Int (if b then Z.one else Z.zero)) in
     let call =
       Textual.Exp.call_non_virtual Textual.ProcDecl.rust_retag_name [dst; borrowed; bool_exp is_mut]
@@ -784,7 +793,18 @@ let mk_retag_instrs ~loc (rhs : Charon.Generated_Expressions.rvalue) ~(dst : Tex
       let is_mut =
         match borrow_kind with BMut | BTwoPhaseMut | BUniqueImmutable -> true | _ -> false
       in
-      mk_retag ~is_mut
+      mk_retag ~borrowed ~is_mut
+  | Use (_, YesRetag) -> (
+      (* The retag runs after the store, so read the copied pointer back from [dst]: evaluating the
+         operand again would observe the store if it reads [dst]. *)
+      let borrowed = Textual.Exp.Load {exp= dst; typ= Some typ} in
+      match ty with
+      | TRef (_, _, RMut) | TAdt {id= TBuiltin TBox} ->
+          mk_retag ~borrowed ~is_mut:true
+      | TRef (_, _, RShared) ->
+          mk_retag ~borrowed ~is_mut:false
+      | _ ->
+          [] )
   | _ ->
       []
 
@@ -862,7 +882,7 @@ let mk_instr crate (place_map : place_map_ty) (statement : Charon.Generated_Ullb
       let exp1 = mk_exp_from_place ~loc crate place_map lhs in
       let exp2, typ = mk_exp_from_rvalue ~loc crate rhs place_map in
       let store_instr = Textual.Instr.Store {exp1; typ= Some typ; exp2; loc} in
-      store_instr :: mk_retag_instrs ~loc rhs ~dst:exp1 ~borrowed:exp2
+      store_instr :: mk_retag_instrs ~loc rhs ~ty:lhs.ty ~typ ~dst:exp1 ~borrowed:exp2
   | StorageDead _ ->
       []
   | StorageLive _ ->
@@ -1027,7 +1047,7 @@ let mk_tuple_type crate (local : Charon.Generated_GAst.local) =
               {Textual.FieldDecl.typ; qualified_name; attributes} )
         in
         [{Textual.Struct.name= tuple_type_name; supers= []; fields; attributes= []}]
-    | TRef (_, ty, _) | TRawPtr (ty, _) ->
+    | TRef (_, ty, _) | TRawPtr (ty, _) | TPattern (ty, _) ->
         mk_tuple ty
     | TAdt {generics} ->
         List.concat_map generics.types ~f:mk_tuple

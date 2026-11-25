@@ -395,9 +395,9 @@ let%expect_test "box" =
 
     declare core::marker::Destruct::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *void) : void
 
-    declare alloc::alloc::Global::{core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
 
-    declare alloc::boxed::Box::{core::marker::Destruct for alloc::boxed::Box<T>[TraitClause@0, TraitClause@1]}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" **void) : void
+    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" **void) : void
     |}]
 
 
@@ -434,8 +434,10 @@ let%expect_test "box_memoryleak" =
           n1:*int = load &b_1
           store &var_2 <- n1:*int
           n2:*int = load &var_2
-          n3 = core::mem::forget(n2)
-          store &var_0 <- n3:void
+          n3 = __rust_retag(&var_2, n2, 1)
+          n4:*int = load &var_2
+          n5 = core::mem::forget(n4)
+          store &var_0 <- n5:void
           jmp node_4
           .handlers node_3
 
@@ -443,8 +445,8 @@ let%expect_test "box_memoryleak" =
           throw "UnwindResume"
 
       #node_4:
-          n4:void = load &var_0
-          ret n4
+          n6:void = load &var_0
+          ret n6
 
     }
 
@@ -459,9 +461,9 @@ let%expect_test "box_memoryleak" =
 
     declare core::marker::Destruct::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *void) : void
 
-    declare alloc::alloc::Global::{core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
 
-    declare alloc::boxed::Box::{core::marker::Destruct for alloc::boxed::Box<T>[TraitClause@0, TraitClause@1]}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" **void) : void
+    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" **void) : void
     |}]
 
 
@@ -538,9 +540,11 @@ let%expect_test "box_use_after_free" =
 
     }
 
-    declare alloc::alloc::Global::{core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+    declare core::marker::Destruct::drop_in_place::<alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]>(.rust_mut = "mut" .rust_pointer = "pointer" **int) : void
 
-    declare alloc::boxed::Box::{core::marker::Destruct for alloc::boxed::Box<i32>[core::marker::Destruct<i32>, alloc::alloc::Global::{core::marker::Destruct for alloc::alloc::Global}]}::drop_in_place::<i32, alloc::alloc::Global>(.rust_mut = "mut" .rust_pointer = "pointer" **int) : void
+    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+
+    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]}::drop_in_place::<i32, alloc::alloc::Global>(.rust_mut = "mut" .rust_pointer = "pointer" **int) : void
     |}]
 
 

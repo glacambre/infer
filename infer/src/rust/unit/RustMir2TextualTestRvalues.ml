@@ -502,9 +502,11 @@ let%expect_test "string" =
       #node_0:
           store &var_0 <- null:void
           store &hello_1 <- "hello":.rust_mut = "const" .rust_pointer = "reference" *String
+          n0:.rust_mut = "const" .rust_pointer = "reference" *String = load &hello_1
+          n1 = __rust_retag(&hello_1, n0, 0)
           store &var_0 <- null:void
-          n0:void = load &var_0
-          ret n0
+          n2:void = load &var_0
+          ret n2
 
     }
     |}]

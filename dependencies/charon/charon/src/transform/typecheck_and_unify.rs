@@ -41,6 +41,12 @@ struct TypeCheckVisitor<'a> {
     /// Remember the names of the types visited up to here.
     visit_stack: Vec<&'static str>,
     body_lt_unifier: Option<UnionFind<RegionId>>,
+    /// Copies of default methods may have contradictory premises like `Self::Item = bool` and
+    /// `Self::Item = u32` which may equate entirely different types. We don't try to reason about
+    /// this and instead accept this fact. It's fine because the original methods will be
+    /// type-checked.
+    /// Example where this matters: tests/ui/traits/default-method-with-item-bound.6.rs
+    accept_type_errors: bool,
 }
 
 impl VisitorWithSpan for TypeCheckVisitor<'_> {
@@ -95,6 +101,9 @@ impl TypeCheckVisitor<'_> {
             (TyKind::Array(aty, _), TyKind::Array(bty, _)) => {
                 self.match_tys(aty, bty)?;
             }
+            (TyKind::Pattern(aty, apat), TyKind::Pattern(bty, bpat)) if apat == bpat => {
+                self.match_tys(aty, bty)?;
+            }
             (TyKind::Slice(aty), TyKind::Slice(bty)) => {
                 self.match_tys(aty, bty)?;
             }
@@ -115,6 +124,7 @@ impl TypeCheckVisitor<'_> {
             (TyKind::TraitType(..), _) | (_, TyKind::TraitType(..)) => {}
             (TyKind::PtrMetadata(..), _) | (_, TyKind::PtrMetadata(..)) => {}
             (TyKind::Error(_), _) | (_, TyKind::Error(_)) => {}
+            _ if self.accept_type_errors => {}
             _ => return Err(TypeError),
         }
         Ok(())
@@ -162,6 +172,13 @@ impl TypeCheckVisitor<'_> {
     }
 
     fn match_generics(&mut self, a: &GenericArgs, b: &GenericArgs) -> Result<(), TypeError> {
+        if a.regions.len() != b.regions.len()
+            || a.types.len() != b.types.len()
+            || a.const_generics.len() != b.const_generics.len()
+            || a.trait_refs.len() != b.trait_refs.len()
+        {
+            return Err(TypeError);
+        }
         for (a, b) in a.regions.iter().zip(b.regions.iter()) {
             self.match_regions(a, b)?;
         }
@@ -190,6 +207,8 @@ impl TypeCheckVisitor<'_> {
             ) => {
                 assert_eq!(src_id, tar_id);
             }
+            // Can happen with `Box`, where the RHS is `Box`. FIXME(#1163): check for Box here.
+            (TyKind::DynTrait(..), TyKind::Adt(..)) => {}
             _ => {
                 let fmt = &self.ctx.into_fmt();
                 self.error(format!(
@@ -352,15 +371,15 @@ impl TypeCheckVisitor<'_> {
     fn assert_matches_method(
         &mut self,
         trait_ref: &TraitRef,
-        method_name: TraitItemName,
+        method_id: TraitMethodId,
         args: &mut GenericArgs,
     ) {
         let trait_id = trait_ref.trait_decl_ref.skip_binder.id;
-        let target = &GenericsSource::Method(trait_id, method_name);
+        let target = &GenericsSource::Method(trait_id, method_id);
         let Some(trait_decl) = self.ctx.translated.trait_decls.get(trait_id) else {
             return;
         };
-        let Some(bound_fn) = trait_decl.methods().find(|m| m.name() == method_name) else {
+        let Some(bound_fn) = trait_decl.methods.get(method_id) else {
             return;
         };
         if let Ok(bound_fn) = Substituted::new_for_trait_ref(bound_fn, trait_ref).try_substitute() {
@@ -368,6 +387,28 @@ impl TypeCheckVisitor<'_> {
             let fmt2 = fmt1.push_binder(Cow::Borrowed(&trait_decl.generics));
             let fmt = fmt2.push_binder(Cow::Borrowed(&bound_fn.params));
             let _ = self.assert_matches(&fmt, &bound_fn.params, args, target);
+        }
+    }
+
+    fn assert_matches_trait_type(
+        &mut self,
+        trait_ref: &TraitRef,
+        type_id: AssocTypeId,
+        args: &mut GenericArgs,
+    ) {
+        let trait_id = trait_ref.trait_id();
+        let target = &GenericsSource::TraitType(trait_id, type_id);
+        let Some(trait_decl) = self.ctx.translated.trait_decls.get(trait_id) else {
+            return;
+        };
+        let Some(bound_ty) = trait_decl.types.get(type_id) else {
+            return;
+        };
+        if let Ok(bound_ty) = Substituted::new_for_trait_ref(bound_ty, trait_ref).try_substitute() {
+            let fmt1 = self.ctx.into_fmt();
+            let fmt2 = fmt1.push_binder(Cow::Borrowed(&trait_decl.generics));
+            let fmt = fmt2.push_binder(Cow::Borrowed(&bound_ty.params));
+            let _ = self.assert_matches(&fmt, &bound_ty.params, args, target);
         }
     }
 }
@@ -389,10 +430,14 @@ impl VisitAstMut for TypeCheckVisitor<'_> {
         }
     }
     fn enter_ty_kind(&mut self, x: &mut TyKind) {
-        if let TyKind::TypeVar(var) = x
-            && self.binder_stack.get_var(*var).is_none()
-        {
-            self.error(format!("Found incorrect type var: {var}"));
+        match x {
+            TyKind::TypeVar(var) if self.binder_stack.get_var(*var).is_none() => {
+                self.error(format!("Found incorrect type var: {var}"));
+            }
+            TyKind::TraitType(trait_ref, type_id, args) => {
+                self.assert_matches_trait_type(trait_ref, *type_id, args);
+            }
+            _ => {}
         }
     }
     fn enter_constant_expr(&mut self, x: &mut ConstantExpr) {
@@ -404,10 +449,8 @@ impl VisitAstMut for TypeCheckVisitor<'_> {
     }
     fn enter_trait_ref(&mut self, x: &mut TraitRef) {
         match &x.kind {
-            TraitRefKind::Clause(var) => {
-                if self.binder_stack.get_var(*var).is_none() {
-                    self.error(format!("Found incorrect clause var: {var}"));
-                }
+            TraitRefKind::Clause(var) if self.binder_stack.get_var(*var).is_none() => {
+                self.error(format!("Found incorrect clause var: {var}"));
             }
             TraitRefKind::BuiltinOrAuto {
                 parent_trait_refs,
@@ -439,19 +482,14 @@ impl VisitAstMut for TypeCheckVisitor<'_> {
                     &target,
                 );
 
-                let types_match = types.len() == tdecl.types.len()
-                    && tdecl
-                        .types
-                        .iter()
-                        .zip(types.iter())
-                        .all(|(dty, (iname, _))| dty.name() == iname);
+                let types_match = types.elem_count() == tdecl.types.elem_count();
                 if !types_match {
                     let args_fmt = &self.val_fmt_ctx();
                     let target = target.with_ctx(args_fmt);
                     let a = tdecl.types.iter().map(|t| t.name()).format(", ");
                     let b = types
                         .iter()
-                        .map(|(_, assoc_ty)| assoc_ty.value.with_ctx(args_fmt))
+                        .map(|assoc_ty| assoc_ty.value.with_ctx(args_fmt))
                         .format(", ");
                     self.error(format!(
                         "Mismatched types in builtin trait ref:\
@@ -482,8 +520,8 @@ impl VisitAstMut for TypeCheckVisitor<'_> {
             FnPtrKind::Fun(FunId::Regular(id)) => self.assert_matches_item(*id, &mut x.generics),
             // TODO: check builtin generics.
             FnPtrKind::Fun(FunId::Builtin(_)) => {}
-            FnPtrKind::Trait(trait_ref, method_name, _) => {
-                self.assert_matches_method(trait_ref, *method_name, &mut x.generics);
+            FnPtrKind::Trait(trait_ref, method_id, _) => {
+                self.assert_matches_method(trait_ref, *method_id, &mut x.generics);
             }
         }
     }
@@ -530,7 +568,7 @@ impl VisitAstMut for TypeCheckVisitor<'_> {
             return;
         };
 
-        let fmt1 = self.ctx.into_fmt();
+        let fmt1 = &self.ctx.into_fmt();
         let tdecl_fmt = fmt1.push_binder(Cow::Borrowed(&tdecl.generics));
         let impl_tref_kind = TraitRefKind::TraitImpl(TraitImplRef {
             id: timpl.def_id,
@@ -549,37 +587,33 @@ impl VisitAstMut for TypeCheckVisitor<'_> {
             &GenericsSource::item(timpl.impl_trait.id),
         );
         // TODO: check type clauses
-        let types_match = timpl.types.len() == tdecl.types.len()
-            && tdecl
-                .types
-                .iter()
-                .zip(timpl.types.iter())
-                .all(|(dty, (iname, _))| dty.name() == iname);
+        let types_match = timpl.types.elem_count() == tdecl.types.elem_count();
         if !types_match {
             self.error(
                 "The associated types supplied by the trait impl don't match the trait decl.",
             )
         }
-        let consts_match = timpl.consts.len() == tdecl.consts.len()
-            && tdecl
-                .consts
-                .iter()
-                .zip(timpl.consts.iter())
-                .all(|(dconst, (iname, _))| &dconst.name == iname);
+        let consts_match = timpl.consts.elem_count() == tdecl.consts.elem_count();
         if !consts_match {
             self.error(
                 "The associated consts supplied by the trait impl don't match the trait decl.",
             )
         }
-        let methods_match = timpl.methods.len() == tdecl.methods.len();
+        let methods_match = timpl.methods.elem_count() == tdecl.methods.elem_count();
         if !methods_match && self.phase != Check::PostTranslation {
             let decl_methods = tdecl
                 .methods()
                 .map(|m| format!("- {}", m.name()))
                 .join("\n");
             let impl_methods = timpl
-                .methods()
-                .map(|(name, _)| format!("- {name}"))
+                .methods
+                .iter_enumerated()
+                .map(|(id, _)| {
+                    std::fmt::from_fn(move |f| {
+                        write!(f, "- ")?;
+                        fmt1.format_method_name(f, tdecl.def_id, id)
+                    })
+                })
                 .join("\n");
             self.error(format!(
                 "The methods supplied by the trait impl don't match the trait decl.\n\
@@ -613,6 +647,18 @@ impl TransformPass for Check {
     }
     fn transform_ctx(&self, ctx: &mut TransformCtx) {
         ctx.for_each_item_mut(|ctx, mut item| {
+            // Accept type errors within copies of default methods. See docs for
+            // `accept_type_errors` for why.
+            let accept_type_errors = matches!(
+                &item,
+                ItemRefMut::Fun(FunDecl {
+                    src: ItemSource::TraitImpl {
+                        reuses_default: true,
+                        ..
+                    },
+                    ..
+                })
+            );
             let mut visitor = TypeCheckVisitor {
                 ctx,
                 phase: *self,
@@ -620,6 +666,7 @@ impl TransformPass for Check {
                 binder_stack: BindingStack::empty(),
                 visit_stack: Default::default(),
                 body_lt_unifier: None,
+                accept_type_errors,
             };
             let _ = item.drive_mut(&mut visitor);
         });
