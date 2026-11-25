@@ -496,10 +496,8 @@ pub enum FnPtrKind {
     #[cfg_attr(feature = "charon_on_charon", charon::rename("FunId"))]
     Fun(FunId),
     /// If a trait: the reference to the trait and the id of the trait method.
-    /// The fun decl id is not really necessary - we put it here for convenience
-    /// purposes.
     #[cfg_attr(feature = "charon_on_charon", charon::rename("TraitMethod"))]
-    Trait(TraitRef, TraitMethodId, FunDeclId),
+    Trait(TraitRef, TraitMethodId),
 }
 
 impl From<FunId> for FnPtrKind {
@@ -658,7 +656,7 @@ pub enum ConstantExprKind {
     ///
     /// We eliminate this case in a micro-pass.
     #[drive(skip)]
-    PtrNoProvenance(u128),
+    PtrNoProvenance(#[serde(with = "crate::ast::values_utils::scalar_value_ser_de")] u128),
     /// Raw memory value obtained from constant evaluation. Used when a more structured
     /// representation isn't possible (e.g. for unions) or just isn't implemented yet.
     #[drive(skip)]

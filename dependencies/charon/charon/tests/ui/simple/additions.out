@@ -4,7 +4,7 @@
 #[lang_item("destruct")]
 pub trait Destruct<Self>
 {
-    fn drop_glue<'_0_1> = drop_glue<'_0_1, Self>
+    fn drop_glue<'_0_1>;
     non-dyn-compatible
 }
 
@@ -25,20 +25,10 @@ pub trait Sized<Self>
 pub trait Clone<Self>
 {
     proof ImpliedClause0: (Self: Sized)
-    fn clone<'_0_1> = core::clone::Clone::clone<'_0_1, Self>[Self]
+    fn clone<'_0_1>;
     fn clone_from<'_0_1, '_1_1, TraitClause0_1: (Self: Destruct)> = core::clone::Clone::clone_from<'_0_1, '_1_1, Self>[Self, TraitClause0_1]
     non-dyn-compatible
 }
-
-#[lang_item("clone_fn")]
-pub fn core::clone::Clone::clone<'_0, Self>(_1: &'_0 Self) -> Self
-where
-    TraitClause0: (Self: Clone),
-= <method_without_default_body>
-
-// Full name: core::marker::Destruct::drop_glue
-unsafe fn drop_glue<'_0, Self>(_1: &'_0 mut Self)
-= <missing>
 
 pub fn core::clone::Clone::clone_from<'_0, '_1, Self>(self_1: &'_0 mut Self, source_2: &'_1 Self)
 where
@@ -49,18 +39,23 @@ where
     let self_1: &'1 mut Self; // arg #1
     let source_2: &'3 Self; // arg #2
     let _3: Self; // anonymous local
+    let _4: &'4 Self; // anonymous local
 
     _0 = ()
     storage_live(_3)
-    _3 = TraitClause0::clone<'5>(move source_2)
+    storage_live(_4)
+    _4 = &(*source_2) with_metadata(copy source_2.metadata)
+    _3 = TraitClause0::clone<'5>(move _4)
+    storage_dead(_4)
     drop[TraitClause1::drop_glue<'6>] (*self_1)
     (*self_1) = move _3
+    _0 = ()
     storage_dead(_3)
     return
 }
 
 // Full name: core::clone::impls::{impl Clone for u8}::clone
-pub fn impl_Clone_for_u8::clone<'_0>(self_1: &'_0 u8) -> u8
+pub fn clone<'_0>(self_1: &'_0 u8) -> u8
 {
     let _0: u8; // return
     let self_1: &'1 u8; // arg #1
@@ -78,12 +73,17 @@ where
     let self_1: &'1 mut u8; // arg #1
     let source_2: &'3 u8; // arg #2
     let _3: u8; // anonymous local
+    let _4: &'4 u8; // anonymous local
 
     _0 = ()
     storage_live(_3)
-    _3 = impl_Clone_for_u8::clone<'5>(move source_2)
+    storage_live(_4)
+    _4 = &(*source_2)
+    _3 = clone<'5>(move _4)
+    storage_dead(_4)
     drop[TraitClause0::drop_glue<'6>] (*self_1)
     (*self_1) = move _3
+    _0 = ()
     storage_dead(_3)
     return
 }
@@ -91,7 +91,7 @@ where
 // Full name: core::clone::impls::{impl Clone for u8}
 impl "impl_Clone_for_u8" Clone for u8 {
     proof ImpliedClause0: (u8: Sized) = {built_in impl Sized for u8}
-    fn clone<'_0_1> = impl_Clone_for_u8::clone<'_0_1>
+    fn clone<'_0_1> = clone<'_0_1>
     fn clone_from<'_0_1, '_1_1, TraitClause0_1: (u8: Destruct)> = impl_Clone_for_u8::clone_from<'_0_1, '_1_1>[TraitClause0_1]
     non-dyn-compatible
 }
@@ -123,8 +123,16 @@ pub fn core::num::{u8}::saturating_add(self_1: u8, rhs_2: u8) -> u8
     let _0: u8; // return
     let self_1: u8; // arg #1
     let rhs_2: u8; // arg #2
+    let _3: u8; // anonymous local
+    let _4: u8; // anonymous local
 
-    _0 = core::intrinsics::saturating_add<u8>[{built_in impl Sized for u8}, impl_Copy_for_u8](move self_1, move rhs_2)
+    storage_live(_3)
+    _3 = copy self_1
+    storage_live(_4)
+    _4 = copy rhs_2
+    _0 = core::intrinsics::saturating_add<u8>[{built_in impl Sized for u8}, impl_Copy_for_u8](move _3, move _4)
+    storage_dead(_4)
+    storage_dead(_3)
     return
 }
 
@@ -134,8 +142,16 @@ pub fn wrapping_add(self_1: u8, rhs_2: u8) -> u8
     let _0: u8; // return
     let self_1: u8; // arg #1
     let rhs_2: u8; // arg #2
+    let _3: u8; // anonymous local
+    let _4: u8; // anonymous local
 
-    _0 = copy self_1 wrap.+ copy rhs_2
+    storage_live(_3)
+    _3 = copy self_1
+    storage_live(_4)
+    _4 = copy rhs_2
+    _0 = move _3 wrap.+ move _4
+    storage_dead(_4)
+    storage_dead(_3)
     return
 }
 
@@ -145,8 +161,36 @@ pub fn overflowing_add(self_1: u8, rhs_2: u8) -> (u8, bool)
     let _0: (u8, bool); // return
     let self_1: u8; // arg #1
     let rhs_2: u8; // arg #2
+    let a_3: u8; // local
+    let b_4: bool; // local
+    let _5: (u8, bool); // anonymous local
+    let _6: u8; // anonymous local
+    let _7: u8; // anonymous local
+    let _8: u8; // anonymous local
+    let _9: bool; // anonymous local
 
-    _0 = copy self_1 checked.+ copy rhs_2
+    storage_live(_5)
+    storage_live(_6)
+    _6 = copy self_1
+    storage_live(_7)
+    _7 = copy rhs_2
+    _5 = move _6 checked.+ move _7
+    storage_dead(_7)
+    storage_dead(_6)
+    storage_live(a_3)
+    a_3 = copy _5.0
+    storage_live(b_4)
+    b_4 = copy _5.1
+    storage_dead(_5)
+    storage_live(_8)
+    _8 = copy a_3
+    storage_live(_9)
+    _9 = copy b_4
+    _0 = (move _8, move _9)
+    storage_dead(_9)
+    storage_dead(_8)
+    storage_dead(b_4)
+    storage_dead(a_3)
     return
 }
 

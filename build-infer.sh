@@ -184,8 +184,8 @@ if [ "$BUILD_CLANG" == "no" ] && [ "$BUILD_ERLANG" == "no" ] && \
   build_all
 fi
 
-CHARON_VERSION="0.1.212"
-CHARON_VERSION_COMMIT="a0ae1729ac8b1cb08d0b53dc2d6cd625e2895651"
+CHARON_VERSION="0.1.216"
+CHARON_VERSION_COMMIT="e9b10cc37af3d1cd20a4f62cceca7331a70a7522"
 # Check for charon on path when rust is enabled
 if [ "$BUILD_RUST" == "yes" ]; then
   if [[ $(charon version) != "$CHARON_VERSION" ]]; then

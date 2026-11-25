@@ -393,8 +393,6 @@ let%expect_test "box" =
 
     }
 
-    declare core::marker::Destruct::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *void) : void
-
     declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
 
     declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" **void) : void
@@ -458,8 +456,6 @@ let%expect_test "box_memoryleak" =
           ret n0
 
     }
-
-    declare core::marker::Destruct::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *void) : void
 
     declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
 
@@ -537,10 +533,6 @@ let%expect_test "box_use_after_free" =
           throw "UnwindResume"
 
     }
-
-    declare core::marker::Destruct::drop_glue::<alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]>(.rust_mut = "mut" .rust_pointer = "reference" **int) : void
-
-    declare core::marker::Destruct::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *void) : void
 
     declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
 
@@ -639,10 +631,6 @@ fn main() {
           throw "UnwindResume"
 
     }
-
-    declare core::marker::Destruct::drop_glue::<alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]>(.rust_mut = "mut" .rust_pointer = "reference" **int) : void
-
-    declare core::marker::Destruct::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *void) : void
 
     declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
 

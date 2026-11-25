@@ -61,6 +61,13 @@ pub struct CliOpts {
     #[clap(long, value_delimiter = ',')]
     #[serde(default)]
     pub targets: Vec<String>,
+    /// Sysroot to use for rustc invocations. By default Charon builds a sysroot that has full MIR
+    /// for the standard library. You can pass a custom sysroot to use instead, or pass "default"
+    /// to use the normal distributed sysroot, which lacks MIR bodies for many standard library
+    /// functions.
+    #[clap(long)]
+    #[serde(default)]
+    pub sysroot: Option<String>,
 
     /// Monomorphize the items encountered when possible. Generic items found in the crate are
     /// skipped. To only translate a particular call graph, use `--start-from`. Note: this doesn't
@@ -92,18 +99,19 @@ pub struct CliOpts {
     #[clap(long, value_delimiter = ',')]
     #[serde(default)]
     pub start_from_if_exists: Vec<String>,
-    /// Use all the items annotated with the given attribute as starting points for translation
+    /// Use all the items annotated with the given attribute(s) as starting points for translation
     /// (except modules).
     /// If an attribute name is not specified, `verify::start_from` is used.
     #[clap(
         long,
         value_name("ATTRIBUTE"),
-        num_args(0..=1),
+        num_args(0..),
         require_equals(true),
+        value_delimiter = ',',
         default_missing_value("verify::start_from"),
     )]
     #[serde(default)]
-    pub start_from_attribute: Option<String>,
+    pub start_from_attribute: Vec<String>,
     /// Use all the `pub` items as starting points for translation (except modules).
     #[clap(long)]
     #[serde(default)]
@@ -465,7 +473,7 @@ impl CliOpts {
                         .push("-Zcrate-attr=feature(register_tool)".to_owned());
                     self.rustc_args
                         .push("-Zcrate-attr=register_tool(charon)".to_owned());
-                    self.exclude.push("core::fmt::Formatter".to_owned());
+                    self.exclude.push("core::fmt".to_owned());
                 }
             }
         }
@@ -560,7 +568,7 @@ impl StartFrom {
                 .iter()
                 .filter_map(|a| a.as_unknown())
                 .any(|raw_attr| raw_attr.path == *attr),
-            StartFrom::Pub => item_meta.attr_info.public,
+            StartFrom::Pub => item_meta.attr_info.public && item_meta.is_local,
         }
     }
 }
@@ -662,7 +670,7 @@ impl TranslateOptions {
                     strict: false,
                 }),
         );
-        if let Some(attr) = options.start_from_attribute.clone() {
+        for attr in options.start_from_attribute.iter().cloned() {
             start_from.push(StartFrom::Attribute(attr));
         }
         if options.start_from_pub {

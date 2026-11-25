@@ -1001,17 +1001,11 @@ let mk_decl crate (fun_decl : Charon.GAst.fun_decl) : Textual.Module.decl option
           (item_meta_to_string crate fun_decl.item_meta)
           s ;
         Some (Textual.Module.Procdecl (mk_procdecl crate fun_decl)) )
-    (* Keep declarations for functions without a translatable body, including external functions,
-       opaque functions, and trait methods without default implementations. *)
     | StructuredBody _ ->
         L.die UserError "Expected ULLBC, but found a structured LLBC body"
-    | TraitMethodWithoutDefaultBody
-    | ExternBody _
-    | IntrinsicBody _
-    | TargetDispatchBody _
-    | OpaqueBody
-    | MissingBody
-    | ErrorBody _ ->
+    (* Keep declarations for functions without a translatable body. *)
+    | ExternBody _ | IntrinsicBody _ | TargetDispatchBody _ | OpaqueBody | MissingBody | ErrorBody _
+      ->
         Some (Textual.Module.Procdecl (mk_procdecl crate fun_decl))
   with L.InferUserError s ->
     (* Catch Translation error so that other functions can still be translated *)
@@ -1071,7 +1065,6 @@ let mk_tuple_decl (crate : Charon.UllbcAst.crate) (fun_decl : Charon.GAst.fun_de
     | UnstructuredBody {locals} ->
         locals.locals
     | StructuredBody _
-    | TraitMethodWithoutDefaultBody
     | ExternBody _
     | IntrinsicBody _
     | TargetDispatchBody _

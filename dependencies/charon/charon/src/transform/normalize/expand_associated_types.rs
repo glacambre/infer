@@ -1091,9 +1091,8 @@ impl UpdateItemBody<'_> {
                         register_error!(
                             self.ctx,
                             self.span,
-                            "Could not compute the value of {path_fmt} on a GAT: \
-                        lifting associated types can fail in the presence of GATs. \
-                        To fix this, `--exclude` this trait."
+                            "GATs cannot work with the `--lift-associated-types` option (implied by `--preset=aeneas`). \
+                            Either stop using this option or `--exclude` this trait."
                         );
                     } else {
                         let item_name = target.item_name(&self.ctx.translated, fmt_ctx);
@@ -1326,7 +1325,7 @@ impl VisitAstMut for UpdateItemBody<'_> {
         match x.kind.as_ref() {
             FnPtrKind::Fun(FunId::Regular(id)) => self.update_item_generics(*id, &mut x.generics),
             FnPtrKind::Fun(FunId::Builtin(_)) => {}
-            FnPtrKind::Trait(trait_ref, method_name, _) => {
+            FnPtrKind::Trait(trait_ref, method_name) => {
                 let trait_id = trait_ref.trait_decl_ref.skip_binder.id;
                 self.update_generics(
                     &mut x.generics,

@@ -597,7 +597,7 @@ fn remove_unmentioned_methods(krate: &mut TranslatedCrate) {
         }
 
         fn enter_fn_ptr(&mut self, fn_ptr: &FnPtr) {
-            if let FnPtrKind::Trait(trait_ref, method_id, _) = fn_ptr.kind.as_ref() {
+            if let FnPtrKind::Trait(trait_ref, method_id) = fn_ptr.kind.as_ref() {
                 (self.0)(Method((trait_ref.trait_id(), *method_id)));
             }
         }
@@ -631,7 +631,6 @@ fn remove_unmentioned_methods(krate: &mut TranslatedCrate) {
 
             match &fun.src {
                 ItemSource::TraitDecl {
-                    has_default: true,
                     item_id: AssocItemId::Method(_),
                     ..
                 }
@@ -708,11 +707,10 @@ fn normalize_item(
 ) -> ItemByVal {
     item.as_mut().drive_mut(&mut IdRefMapperVisitor::new(remap));
     item.as_mut().set_id(canonical_id);
-    item.as_mut()
-        .item_meta()
-        .name
-        .name
-        .retain(|elem| !matches!(elem, PathElem::Target(_)));
+    item.as_mut().dyn_visit_mut(|name: &mut Name| {
+        name.name
+            .retain(|elem| !matches!(elem, PathElem::Target(_)))
+    });
 
     strip_unstable_attributes(&mut item);
     // Ignore source text and spans: if the items are otherwise identical, it's ok to just pick one
@@ -740,7 +738,7 @@ fn strip_unstable_attributes(item: &mut ItemByVal) {
 
     if let ItemByVal::TraitDecl(d) = item {
         for method in &mut d.methods {
-            strip_in_vec(&mut method.skip_binder.attr_info);
+            strip_in_vec(&mut method.skip_binder.item_meta.attr_info);
         }
         for cst in &mut d.consts {
             strip_in_vec(&mut cst.attr_info);
@@ -801,10 +799,8 @@ impl VisitAstMut for IdRefMapperVisitor<'_> {
         }
     }
     fn enter_fn_ptr(&mut self, x: &mut FnPtr) {
-        match &mut *x.kind {
-            FnPtrKind::Fun(FunId::Regular(id)) => self.map(id),
-            FnPtrKind::Trait(_, _, id) => self.map(id),
-            _ => {}
+        if let FnPtrKind::Fun(FunId::Regular(id)) = x.kind.as_mut() {
+            self.map(id)
         }
     }
     fn enter_fun_decl(&mut self, x: &mut FunDecl) {

@@ -628,11 +628,10 @@ and fn_ptr_kind_of_json (ctx : of_json_ctx) (js : json) :
     | `Assoc [ ("Fun", fun_) ] ->
         let* fun_ = fun_id_of_json ctx fun_ in
         Ok (FunId fun_)
-    | `Assoc [ ("Trait", `List [ x_0; x_1; x_2 ]) ] ->
+    | `Assoc [ ("Trait", `List [ x_0; x_1 ]) ] ->
         let* x_0 = trait_ref_of_json ctx x_0 in
         let* x_1 = trait_method_id_of_json ctx x_1 in
-        let* x_2 = fun_decl_id_of_json ctx x_2 in
-        Ok (TraitMethod (x_0, x_1, x_2))
+        Ok (TraitMethod (x_0, x_1))
     | _ -> Error "")
 
 and fun_decl_id_of_json (ctx : of_json_ctx) (js : json) :
@@ -2000,7 +1999,6 @@ and body_of_json (ctx : of_json_ctx) (js : json) : (body, string) result =
             target_dispatch
         in
         Ok (TargetDispatchBody target_dispatch)
-    | `String "TraitMethodWithoutDefault" -> Ok TraitMethodWithoutDefaultBody
     | `Assoc [ ("Extern", extern) ] ->
         let* extern = string_of_json ctx extern in
         Ok (ExternBody extern)
@@ -2031,6 +2029,7 @@ and cli_options_of_json (ctx : of_json_ctx) (js : json) :
           ("mir", mir);
           ("rustc_args", rustc_args);
           ("targets", targets);
+          ("sysroot", sysroot);
           ("monomorphize", monomorphize);
           ("monomorphize_mut", monomorphize_mut);
           ("start_from", start_from);
@@ -2078,6 +2077,7 @@ and cli_options_of_json (ctx : of_json_ctx) (js : json) :
         let* mir = option_of_json mir_level_of_json ctx mir in
         let* rustc_args = list_of_json string_of_json ctx rustc_args in
         let* targets = list_of_json string_of_json ctx targets in
+        let* sysroot = option_of_json string_of_json ctx sysroot in
         let* monomorphize = bool_of_json ctx monomorphize in
         let* monomorphize_mut =
           option_of_json monomorphize_mut_of_json ctx monomorphize_mut
@@ -2087,7 +2087,7 @@ and cli_options_of_json (ctx : of_json_ctx) (js : json) :
           list_of_json string_of_json ctx start_from_if_exists
         in
         let* start_from_attribute =
-          option_of_json string_of_json ctx start_from_attribute
+          list_of_json string_of_json ctx start_from_attribute
         in
         let* start_from_pub = bool_of_json ctx start_from_pub in
         let* included = list_of_json string_of_json ctx include_ in
@@ -2146,6 +2146,7 @@ and cli_options_of_json (ctx : of_json_ctx) (js : json) :
              mir;
              rustc_args;
              targets;
+             sysroot;
              monomorphize;
              monomorphize_mut;
              start_from;
@@ -2570,17 +2571,11 @@ and item_source_of_json (ctx : of_json_ctx) (js : json) :
     | `Assoc
         [
           ( "TraitDecl",
-            `Assoc
-              [
-                ("trait_ref", trait_ref);
-                ("item_id", item_id);
-                ("has_default", has_default);
-              ] );
+            `Assoc [ ("trait_ref", trait_ref); ("item_id", item_id) ] );
         ] ->
         let* trait_ref = trait_decl_ref_of_json ctx trait_ref in
         let* item_id = assoc_item_id_of_json ctx item_id in
-        let* has_default = bool_of_json ctx has_default in
-        Ok (TraitDeclItem (trait_ref, item_id, has_default))
+        Ok (TraitDeclItem (trait_ref, item_id))
     | `Assoc
         [
           ( "TraitImpl",
@@ -2961,15 +2956,15 @@ and trait_method_of_json (ctx : of_json_ctx) (js : json) :
     | `Assoc
         [
           ("name", name);
-          ("attr_info", attr_info);
+          ("item_meta", item_meta);
           ("signature", signature);
-          ("item", item);
+          ("default", default);
         ] ->
         let* name = trait_item_name_of_json ctx name in
-        let* attr_info = attr_info_of_json ctx attr_info in
+        let* item_meta = item_meta_of_json ctx item_meta in
         let* signature = fun_sig_of_json ctx signature in
-        let* item = fun_decl_ref_of_json ctx item in
-        Ok ({ name; attr_info; signature; item } : trait_method)
+        let* default = option_of_json fun_decl_ref_of_json ctx default in
+        Ok ({ name; item_meta; signature; default } : trait_method)
     | _ -> Error "")
 
 and translated_crate_of_json (ctx : of_json_ctx) (js : json) :
