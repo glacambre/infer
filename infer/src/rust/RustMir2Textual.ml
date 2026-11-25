@@ -63,11 +63,8 @@ let name_of_path_element crate (path_element : Charon.Generated_Types.path_elem)
 
 
 let name_of_field (field : Charon.Generated_Types.field) (field_id : int) : Textual.FieldName.t =
-  match field.field_name with
-  | Some name ->
-      Textual.FieldName.of_string name
-  | None ->
-      Textual.FieldName.of_string (Int.to_string field_id)
+  let name = if field.is_positional then Int.to_string field_id else field.field_name in
+  Textual.FieldName.of_string name
 
 
 let mk_name crate (name : Charon.Generated_Types.name) : Textual.ProcName.t =
@@ -1015,15 +1012,27 @@ let mk_decl crate (fun_decl : Charon.GAst.fun_decl) : Textual.Module.decl option
     None
 
 
-(* A global's value is a constant expression, usually a call to its initializer function. *)
+(* A global's value is a constant expression, by default a call to its initializer function. With
+   [--consts=values], Charon evaluates it to a constant instead, which we may not be able to
+   translate: keep the global without an initializer rather than failing the whole module. *)
 let mk_global crate (global_decl : Charon.Generated_GAst.global_decl) =
   let name = global_to_varname crate global_decl.item_meta in
   let typ = ty_to_textual_typ crate global_decl.ty in
-  let init_exp = mk_const_exp crate global_decl.value.kind in
-  let global =
-    Textual.Module.Global {Textual.Global.name; attributes= []; init_exp= Some init_exp; typ}
+  let no_init_exp reason =
+    L.user_warning "[WARNING] Could not translate the value of %s: @. [REASON]: %s @."
+      (item_meta_to_string crate global_decl.item_meta)
+      reason ;
+    None
   in
-  global
+  let init_exp =
+    match global_decl.value.kind with
+    | CLiteral _ | CCall _ -> (
+      try Some (mk_const_exp crate global_decl.value.kind)
+      with L.InferUserError s | L.InferExternalError s -> no_init_exp s )
+    | _ ->
+        no_init_exp "only literals and initializer calls are supported"
+  in
+  Textual.Module.Global {Textual.Global.name; attributes= []; init_exp; typ}
 
 
 (* If this local is a tuple type, create a tuple struct with the indices as field names. *)

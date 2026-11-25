@@ -1,7 +1,7 @@
 # Final ULLBC before serialization:
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -9,22 +9,24 @@ pub trait Destruct<Self>
 }
 
 // Full name: core::mem::forget
-#[lang_item("mem_forget")]
-pub fn forget<T>(t_1: T)
+#[diagnostic_item("mem_forget")]
+pub fn forget<T>(t: T)
 where
     TraitClause0: (T: Destruct),
 {
     let _0: (); // return
-    let t_1: T; // arg #1
+    let t: T; // arg #1
 
     bb0: {
+        storage_live(_0);
         _0 = ();
+        storage_dead(t);
         return;
     }
 }
 
 // Full name: alloc::alloc::Global
-#[lang_item("global_alloc_ty")]
+#[lang_item(GlobalAlloc)]
 pub struct Global {}
 
 // Full name: alloc::alloc::Global::{impl Destruct for Global}::drop_glue
@@ -42,6 +44,8 @@ unsafe fn impl_Destruct_for_Box::drop_glue<'_0, T, A>(_1: &'_0 mut alloc::boxed:
 where
     TraitClause0: (T: Destruct),
     TraitClause1: (A: Destruct),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: A: '_0,
 = <opaque>
 
 // Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}
@@ -58,14 +62,15 @@ where
 fn main()
 {
     let _0: (); // return
-    let b_1: alloc::boxed::Box<i32>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]; // local
+    let b: alloc::boxed::Box<i32>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]; // local
     let _2: (); // anonymous local
     let _3: alloc::boxed::Box<i32>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]; // anonymous local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(b_1);
-        b_1 = @BoxNew<i32>[{built_in impl Destruct for i32}](const 42i32) -> bb2 (unwind: bb1);
+        storage_live(b);
+        b = @BoxNew<i32>[{built_in impl Destruct for i32}](const 42i32) -> bb2 (unwind: bb1);
     }
 
     bb1: {
@@ -75,7 +80,7 @@ fn main()
     bb2: {
         storage_live(_2);
         storage_live(_3);
-        _3 = move b_1;
+        _3 = move b;
         _2 = forget<alloc::boxed::Box<i32>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]>[impl_Destruct_for_Box<i32, Global>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]](move _3) -> bb4 (unwind: bb3);
     }
 
@@ -87,7 +92,7 @@ fn main()
         storage_dead(_3);
         storage_dead(_2);
         _0 = ();
-        storage_dead(b_1);
+        storage_dead(b);
         return;
     }
 }

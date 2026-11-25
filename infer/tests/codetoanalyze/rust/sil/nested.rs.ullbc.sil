@@ -28,24 +28,22 @@ define nested::swi_nested(a_1: int, b_2: int) : int {
   #node_2:
       prune __sil_lnot(n2)
       store &var_0 <- 3:int
-      jmp node_5
+      n6:int = load &var_0
+      ret n6
       
   #node_3:
       prune n5
       store &var_0 <- 1:int
-      jmp node_6
+      jmp node_5
       
   #node_4:
       prune __sil_lnot(n5)
       store &var_0 <- 2:int
-      jmp node_6
+      jmp node_5
       
   #node_5:
-      n6:int = load &var_0
-      ret n6
-      
-  #node_6:
-      jmp node_5
+      n7:int = load &var_0
+      ret n7
       
 }
 

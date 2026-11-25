@@ -1,15 +1,17 @@
 # Final ULLBC before serialization:
 
 // Full name: call_invalidates_sibling_ub::write
-fn write<'_0>(a_1: &'_0 mut i32)
+fn write<'_0>(a: &'_0 mut i32)
 {
     let _0: (); // return
-    let a_1: &'1 mut i32; // arg #1
+    let a: &'1 mut i32; // arg #1
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        (*a_1) = const 1i32;
+        (*a) = const 1i32;
         _0 = ();
+        storage_dead(a);
         return;
     }
 }
@@ -18,38 +20,39 @@ fn write<'_0>(a_1: &'_0 mut i32)
 fn main()
 {
     let _0: (); // return
-    let v_1: i32; // local
-    let p_2: *mut i32; // local
+    let v: i32; // local
+    let p: *mut i32; // local
     let _3: &'1 mut i32; // anonymous local
-    let q_4: &'2 mut i32; // local
+    let q: &'2 mut i32; // local
     let _5: &'3 mut i32; // anonymous local
-    let r_6: &'4 mut i32; // local
+    let r: &'4 mut i32; // local
     let _7: &'5 mut i32; // anonymous local
     let _8: (); // anonymous local
     let _9: &'6 mut i32; // anonymous local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(v_1);
-        v_1 = const 0i32;
-        storage_live(p_2);
+        storage_live(v);
+        v = const 0i32;
+        storage_live(p);
         storage_live(_3);
-        _3 = &mut v_1;
-        p_2 = &raw mut (*_3);
+        _3 = &mut v;
+        p = &raw mut (*_3);
         storage_dead(_3);
-        storage_live(q_4);
+        storage_live(q);
         storage_live(_5);
-        _5 = &mut (*p_2);
-        q_4 = &mut (*_5);
+        _5 = &mut (*p);
+        q = &mut (*_5);
         storage_dead(_5);
-        storage_live(r_6);
+        storage_live(r);
         storage_live(_7);
-        _7 = &mut (*p_2);
-        r_6 = &mut (*_7);
+        _7 = &mut (*p);
+        r = &mut (*_7);
         storage_dead(_7);
         storage_live(_8);
         storage_live(_9);
-        _9 = &two-phase-mut (*q_4);
+        _9 = &two-phase-mut (*q);
         _8 = write<'8>(move _9) -> bb2 (unwind: bb1);
     }
 
@@ -60,12 +63,12 @@ fn main()
     bb2: {
         storage_dead(_9);
         storage_dead(_8);
-        (*r_6) = const 5i32;
+        (*r) = const 5i32;
         _0 = ();
-        storage_dead(r_6);
-        storage_dead(q_4);
-        storage_dead(p_2);
-        storage_dead(v_1);
+        storage_dead(r);
+        storage_dead(q);
+        storage_dead(p);
+        storage_dead(v);
         return;
     }
 }

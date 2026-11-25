@@ -93,6 +93,69 @@ fn main() {
     |}]
 
 
+(* With [--consts=values], Charon gives a global its evaluated value instead of a call to its
+   initializer. A value that we cannot translate, such as a struct, leaves the global without an
+   initializer instead of aborting the translation of the module. *)
+let%expect_test "global values" =
+  let source =
+    {|
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+const ORIGIN: Point = Point { x: 0, y: 2 };
+const SEVEN: i32 = 7;
+
+#[allow(unused)]
+fn main() {
+    let x = ORIGIN.x + ORIGIN.y + SEVEN;
+}
+|}
+  in
+  test ~args:"--consts=values" source ;
+  [%expect
+    {|
+    [WARNING] Could not translate the value of dummy::ORIGIN:
+     [REASON]: only literals and initializer calls are supported
+    .source_language = "Rust"
+
+    type dummy::Point = {x: int; y: int}
+
+    define dummy::main() : void {
+      local var_0: void, x_1: int, var_2: int, var_3: int, var_4: dummy::Point, var_5: int, var_6: dummy::Point, var_7: int, var_8: int
+      #node_0:
+          store &var_0 <- null:void
+          n0:dummy::Point = load &GLOBAL@dummy::ORIGIN
+          store &var_4 <- n0:dummy::Point
+          n1:int = load &var_4.dummy::Point.x
+          store &var_3 <- n1:int
+          n2:dummy::Point = load &GLOBAL@dummy::ORIGIN
+          store &var_6 <- n2:dummy::Point
+          n3:int = load &var_6.dummy::Point.y
+          store &var_5 <- n3:int
+          n4:int = load &var_3
+          n5:int = load &var_5
+          store &var_7 <- __sil_plusa_int(n4, n5):int
+          n6:int = load &var_7
+          store &var_2 <- n6:int
+          n7:int = load &var_2
+          n8:int = load &GLOBAL@dummy::SEVEN
+          store &var_8 <- __sil_plusa_int(n7, n8):int
+          n9:int = load &var_8
+          store &x_1 <- n9:int
+          store &var_0 <- null:void
+          n10:void = load &var_0
+          ret n10
+
+    }
+
+    global GLOBAL@dummy::ORIGIN: dummy::Point
+
+    global GLOBAL@dummy::SEVEN: int = [Some 7]
+    |}]
+
+
 let%expect_test "external function declaration" =
   test
     {|

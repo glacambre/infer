@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -49,6 +49,7 @@ where
 {
     let _0: usize; // return
 
+    storage_live(_0)
     _0 = copy FOO<T>[impl_Trait_for_T<T>[TraitClause0]]
     return
 }
@@ -61,9 +62,11 @@ where
     let _0: (); // return
     let _1: usize; // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_1)
     _1 = foo<T>[TraitClause0]()
+    ↳⚡ unwind_continue
     storage_dead(_1)
     _0 = ()
     return

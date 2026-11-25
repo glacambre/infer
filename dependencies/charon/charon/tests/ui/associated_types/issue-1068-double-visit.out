@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -47,7 +47,7 @@ where
     TraitClause0: (A: Sized),
     TraitClause1: (A: HasType1<Clause1_Type1>),
 {
-  A,
+  _0: A,
 }
 
 // Full name: test_crate::{impl HasType2<Comparator<Witness1, ()>[{built_in impl Sized for Witness1}, impl_HasType1_for_Witness1]> for Witness2}
@@ -84,6 +84,7 @@ where
 {
     let _0: (); // return
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
     return
@@ -94,8 +95,10 @@ fn main()
 {
     let _0: (); // return
 
+    storage_live(_0)
     _0 = ()
     _0 = check<Witness2, Comparator<Witness1, ()>[{built_in impl Sized for Witness1}, impl_HasType1_for_Witness1]>[{built_in impl Sized for Witness2}, impl_HasType3_for_T<Witness2, Comparator<Witness1, ()>[{built_in impl Sized for Witness1}, impl_HasType1_for_Witness1]>[{built_in impl Sized for Witness2}, impl_HasType2_for_Witness2]]()
+    ↳⚡ unwind_continue
     return
 }
 

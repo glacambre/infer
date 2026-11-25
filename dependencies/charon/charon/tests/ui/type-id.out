@@ -1,13 +1,13 @@
 # Final LLBC before serialization:
 
 // Full name: core::any::TypeId
-#[lang_item("type_id")]
+#[lang_item(TypeId)]
 pub struct TypeId {
   data: [*const (); 2usize],
 }
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::intrinsics::type_id
@@ -15,9 +15,10 @@ pub fn type_id<T>() -> TypeId
 where
     TraitClause0: (T: MetaSized),
 {
-    let ret_0: TypeId; // return
+    let ret: TypeId; // return
 
-    ret_0 = const TypeId(T)
+    storage_live(ret)
+    ret = const TypeId(T)
     return
 }
 
@@ -34,13 +35,17 @@ where
     storage_live(_1)
     storage_live(_2)
     _2 = type_id<T>[TraitClause0]()
+    ↳⚡ undefined_behavior
     _1 = move _2
+    storage_live(_0)
     _0 = move _1
+    storage_dead(_2)
+    storage_dead(_1)
     return
 }
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -52,7 +57,9 @@ fn type_id_u32() -> TypeId
 {
     let _0: TypeId; // return
 
+    storage_live(_0)
     _0 = of<u32>[{built_in impl MetaSized for u32}]()
+    ↳⚡ unwind_continue
     return
 }
 
@@ -64,7 +71,9 @@ where
 {
     let _0: TypeId; // return
 
+    storage_live(_0)
     _0 = of<T>[TraitClause0::ImpliedClause0]()
+    ↳⚡ unwind_continue
     return
 }
 

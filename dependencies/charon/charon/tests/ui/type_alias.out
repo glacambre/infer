@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::borrow::Borrow
-#[lang_item("Borrow")]
+#[diagnostic_item("Borrow")]
 pub trait Borrow<Self, Borrowed>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -15,7 +15,7 @@ pub trait Borrow<Self, Borrowed>
 }
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -23,7 +23,8 @@ pub trait Sized<Self>
 }
 
 // Full name: core::clone::Clone
-#[lang_item("clone")]
+#[lang_item(Clone)]
+#[diagnostic_item("Clone")]
 pub trait Clone<Self>
 {
     proof ImpliedClause0: (Self: Sized)
@@ -32,11 +33,11 @@ pub trait Clone<Self>
 }
 
 // Full name: alloc::alloc::Global
-#[lang_item("global_alloc_ty")]
+#[lang_item(GlobalAlloc)]
 pub struct Global {}
 
 // Full name: alloc::borrow::ToOwned
-#[lang_item("ToOwned")]
+#[diagnostic_item("ToOwned")]
 pub trait ToOwned<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -48,7 +49,7 @@ pub trait ToOwned<Self>
 }
 
 // Full name: alloc::borrow::Cow
-#[lang_item("Cow")]
+#[diagnostic_item("Cow")]
 pub enum Cow<'a, B>
 where
     TraitClause0: (B: MetaSized),
@@ -56,12 +57,12 @@ where
     TypeOutlives0: B: 'a,
     TypeOutlives1: B: 'a,
 {
-  Borrowed(&'a B),
-  Owned(TraitClause1::Owned),
+  Borrowed { _0: &'a B },
+  Owned { _0: TraitClause1::Owned },
 }
 
 // Full name: alloc::vec::Vec
-#[lang_item("Vec")]
+#[diagnostic_item("Vec")]
 pub opaque type Vec<T>
 where
     TraitClause0: (T: Sized),
@@ -72,6 +73,8 @@ pub fn borrow<'_0, T, A>(_1: &'_0 Vec<T>[TraitClause0, TraitClause1]) -> &'_0 [T
 where
     TraitClause0: (T: Sized),
     TraitClause1: (A: Sized),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: A: '_0,
 = <opaque>
 
 // Full name: alloc::slice::{impl Borrow<[T]> for Vec<T>[TraitClause0, TraitClause1]}
@@ -91,6 +94,7 @@ pub fn to_owned<'_0, T>(_1: &'_0 [T]) -> Vec<T>[TraitClause0, {built_in impl Siz
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Clone),
+    TypeOutlives0: T: '_0,
 = <opaque>
 
 // Full name: alloc::slice::{impl ToOwned for [T]}

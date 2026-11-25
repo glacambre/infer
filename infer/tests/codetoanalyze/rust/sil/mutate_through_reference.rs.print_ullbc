@@ -4,19 +4,20 @@
 fn main()
 {
     let _0: (); // return
-    let x_1: i32; // local
-    let ptr_2: &'1 mut i32; // local
+    let x: i32; // local
+    let ptr: &'1 mut i32; // local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(x_1);
-        x_1 = const 10i32;
-        storage_live(ptr_2);
-        ptr_2 = &mut x_1;
-        (*ptr_2) = const 20i32;
+        storage_live(x);
+        x = const 10i32;
+        storage_live(ptr);
+        ptr = &mut x;
+        (*ptr) = const 20i32;
         _0 = ();
-        storage_dead(ptr_2);
-        storage_dead(x_1);
+        storage_dead(ptr);
+        storage_dead(x);
         return;
     }
 }

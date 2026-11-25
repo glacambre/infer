@@ -1,11 +1,11 @@
 # Final ULLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,8 @@ pub trait Sized<Self>
 }
 
 // Full name: core::clone::Clone
-#[lang_item("clone")]
+#[lang_item(Clone)]
+#[diagnostic_item("Clone")]
 pub trait Clone<Self>
 {
     proof ImpliedClause0: (Self: Sized)
@@ -44,7 +45,8 @@ impl "impl_Clone_for_usize" Clone for usize {
 }
 
 // Full name: core::cmp::PartialEq
-#[lang_item("eq")]
+#[lang_item(PartialEq)]
+#[diagnostic_item("PartialEq")]
 pub trait PartialEq<Self, Rhs>
 {
     fn eq<'_0_1, '_1_1>;
@@ -52,7 +54,7 @@ pub trait PartialEq<Self, Rhs>
 }
 
 // Full name: core::cmp::Ordering
-#[lang_item("Ordering")]
+#[lang_item(OrderingEnum)]
 pub enum Ordering {
   Less,
   Equal,
@@ -60,17 +62,19 @@ pub enum Ordering {
 }
 
 // Full name: core::option::Option
-#[lang_item("Option")]
+#[lang_item(Option)]
+#[diagnostic_item("Option")]
 pub enum Option<T>
 where
     TraitClause0: (T: Sized),
 {
   None,
-  Some(T),
+  Some { _0: T },
 }
 
 // Full name: core::cmp::PartialOrd
-#[lang_item("partial_ord")]
+#[lang_item(PartialOrd)]
+#[diagnostic_item("PartialOrd")]
 pub trait PartialOrd<Self, Rhs>
 {
     proof ImpliedClause0: (Self: PartialEq<Rhs>)
@@ -121,7 +125,7 @@ impl "impl_PartialOrd_usize_for_usize" PartialOrd<usize> for usize {
 }
 
 // Full name: core::iter::range::Step
-#[lang_item("range_step")]
+#[diagnostic_item("range_step")]
 pub trait Step<Self>
 {
     proof ImpliedClause0: (Self: Sized)
@@ -180,7 +184,7 @@ impl "impl_Step_for_i32" Step for i32 {
 }
 
 // Full name: core::ops::range::Range
-#[lang_item("Range")]
+#[lang_item(Range)]
 pub struct Range<Idx>
 where
     TraitClause0: (Idx: Sized),
@@ -190,7 +194,8 @@ where
 }
 
 // Full name: core::iter::traits::iterator::Iterator
-#[lang_item("iterator")]
+#[lang_item(Iterator)]
+#[diagnostic_item("Iterator")]
 pub trait Iterator<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -205,6 +210,7 @@ pub fn next<'_0, A>(_1: &'_0 mut Range<A>[TraitClause0]) -> Option<A>[TraitClaus
 where
     TraitClause0: (A: Sized),
     TraitClause1: (A: Step),
+    TypeOutlives0: A: '_0,
 = <opaque>
 
 // Full name: core::iter::range::{impl Iterator for Range<A>[TraitClause0]}
@@ -228,12 +234,12 @@ where
 = <opaque>
 
 // Full name: test_crate::nested_loops_enum
-pub fn nested_loops_enum(step_out_1: usize, step_in_2: usize) -> usize
+pub fn nested_loops_enum(step_out: usize, step_in: usize) -> usize
 {
     let _0: usize; // return
-    let step_out_1: usize; // arg #1
-    let step_in_2: usize; // arg #2
-    let s_3: usize; // local
+    let step_out: usize; // arg #1
+    let step_in: usize; // arg #2
+    let s: usize; // local
     let _4: Range<i32>[{built_in impl Sized for i32}]; // anonymous local
     let _5: Range<i32>[{built_in impl Sized for i32}]; // anonymous local
     let iter_6: Range<i32>[{built_in impl Sized for i32}]; // local
@@ -263,13 +269,15 @@ pub fn nested_loops_enum(step_out_1: usize, step_in_2: usize) -> usize
     let _30: usize; // anonymous local
 
     bb0: {
+        storage_live(_0);
         storage_live(_10);
         storage_live(_11);
         storage_live(_19);
         storage_live(_27);
         storage_live(_28);
-        storage_live(s_3);
-        s_3 = const 0usize;
+        storage_live(s);
+        s = const 0usize;
+        fake_read(s);
         storage_live(_4);
         storage_live(_5);
         _5 = Range { start: const 0i32, end: const 128i32 };
@@ -277,6 +285,13 @@ pub fn nested_loops_enum(step_out_1: usize, step_in_2: usize) -> usize
     }
 
     bb1: {
+        storage_dead(_28);
+        storage_dead(_27);
+        storage_dead(_19);
+        storage_dead(_11);
+        storage_dead(_10);
+        storage_dead(step_in);
+        storage_dead(step_out);
         unwind_continue;
     }
 
@@ -310,21 +325,22 @@ pub fn nested_loops_enum(step_out_1: usize, step_in_2: usize) -> usize
         storage_live(_12);
         storage_live(_13);
         storage_live(_14);
-        _14 = copy step_out_1;
+        _14 = copy step_out;
         _13 = Range { start: const 0usize, end: move _14 };
         storage_dead(_14);
         _12 = into_iter<Range<usize>[{built_in impl Sized for usize}]>[{built_in impl Sized for Range<usize>[{built_in impl Sized for usize}]}, impl_Iterator_for_Range<usize>[{built_in impl Sized for usize}, impl_Step_for_usize]](move _13) -> bb8 (unwind: bb1);
     }
 
     bb6: {
-        _11 = copy s_3 panic.+ const 1usize;
-        s_3 = move _11;
+        _11 = copy s panic.+ const 1usize;
+        s = move _11;
         storage_dead(_9);
         storage_dead(_7);
         goto bb3;
     }
 
     bb7: {
+        fake_read(_7);
         undefined_behavior;
     }
 
@@ -356,8 +372,15 @@ pub fn nested_loops_enum(step_out_1: usize, step_in_2: usize) -> usize
         storage_dead(_16);
         storage_dead(iter_15);
         storage_dead(_12);
-        _0 = copy s_3;
-        storage_dead(s_3);
+        _0 = copy s;
+        storage_dead(s);
+        storage_dead(_28);
+        storage_dead(_27);
+        storage_dead(_19);
+        storage_dead(_11);
+        storage_dead(_10);
+        storage_dead(step_in);
+        storage_dead(step_out);
         return;
     }
 
@@ -365,13 +388,14 @@ pub fn nested_loops_enum(step_out_1: usize, step_in_2: usize) -> usize
         storage_live(_20);
         storage_live(_21);
         storage_live(_22);
-        _22 = copy step_in_2;
+        _22 = copy step_in;
         _21 = Range { start: const 0usize, end: move _22 };
         storage_dead(_22);
         _20 = into_iter<Range<usize>[{built_in impl Sized for usize}]>[{built_in impl Sized for Range<usize>[{built_in impl Sized for usize}]}, impl_Iterator_for_Range<usize>[{built_in impl Sized for usize}, impl_Step_for_usize]](move _21) -> bb14 (unwind: bb1);
     }
 
     bb13: {
+        fake_read(_16);
         undefined_behavior;
     }
 
@@ -408,20 +432,13 @@ pub fn nested_loops_enum(step_out_1: usize, step_in_2: usize) -> usize
     }
 
     bb18: {
-        _28 = copy s_3 panic.+ const 1usize;
-        s_3 = move _28;
+        _28 = copy s panic.+ const 1usize;
+        s = move _28;
         storage_live(_29);
         storage_live(_30);
-        _30 = copy s_3;
+        _30 = copy s;
         _29 = move _30 >= const 1usize;
-        if move _29 -> bb20 else -> bb21;
-    }
-
-    bb19: {
-        undefined_behavior;
-    }
-
-    bb20: {
+        assert(move _29 == true) else panic(core::panicking::panic);
         storage_dead(_30);
         storage_dead(_29);
         storage_dead(_26);
@@ -429,9 +446,9 @@ pub fn nested_loops_enum(step_out_1: usize, step_in_2: usize) -> usize
         goto bb15;
     }
 
-    bb21: {
-        storage_dead(_30);
-        panic(core::panicking::panic);
+    bb19: {
+        fake_read(_24);
+        undefined_behavior;
     }
 }
 

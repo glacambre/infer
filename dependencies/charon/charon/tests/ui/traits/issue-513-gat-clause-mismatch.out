@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,8 @@ pub trait Sized<Self>
 }
 
 // Full name: core::clone::Clone
-#[lang_item("clone")]
+#[lang_item(Clone)]
+#[diagnostic_item("Clone")]
 pub trait Clone<Self>
 {
     proof ImpliedClause0: (Self: Sized)
@@ -22,7 +23,8 @@ pub trait Clone<Self>
 }
 
 // Full name: core::marker::Copy
-#[lang_item("copy")]
+#[lang_item(Copy)]
+#[diagnostic_item("Copy")]
 pub trait Copy<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -57,12 +59,16 @@ where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Trait),
     TraitClause2: (T: Copy),
+    TypeOutlives0: TraitClause1::Type[TraitClause2]: '_0,
+    TypeOutlives1: T: '_0,
 {
     let _0: (); // return
     let _1: &'1 TraitClause1::Type[TraitClause2]; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
+    storage_dead(_1)
     return
 }
 
@@ -70,8 +76,14 @@ where
 fn main()
 {
     let _0: (); // return
+    let _1: (); // anonymous local
 
+    storage_live(_0)
     _0 = ()
+    storage_live(_1)
+    _1 = ()
+    set_type(typeof(_1) <= ())
+    storage_dead(_1)
     _0 = ()
     return
 }

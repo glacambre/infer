@@ -12,40 +12,126 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     crane.url = "github:ipetkov/crane";
+    jail-nix.url = "sourcehut:~alexdavid/jail.nix";
   };
 
-  outputs = { self, flake-utils, nixpkgs, rust-overlay, crane, ... }:
+  outputs = { self, flake-utils, nixpkgs, rust-overlay, crane, jail-nix, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
           overlays = [ (import rust-overlay) ];
         };
+        inherit (pkgs) lib stdenv makeWrapper bintools;
 
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain;
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
-        ocamlformat = pkgs.ocamlPackages.ocamlformat_0_27_0;
+
+        # nixpkgs marks ocamlformat broken for OCaml 5.4, so build it with 5.3 instead
+        ocamlformat = pkgs.ocaml-ng.ocamlPackages_5_3.ocamlformat_0_27_0;
+
+        # Glibc version that the Linux release binaries are lowered to after building
+        # to ensure compatibility with older Linux systems
+        releaseGlibcVersion = "2.35";
+        polyfill-glibc = pkgs.callPackage ./nix/polyfill-glibc.nix { };
 
         fullMirSysroots = pkgs.callPackage ./nix/full-mir-sysroots.nix { inherit rustToolchain; };
-        charon = pkgs.callPackage ./nix/charon.nix {
-          inherit craneLib rustToolchain;
+        charon-unwrapped = pkgs.callPackage ./nix/charon.nix {
+          inherit craneLib;
           miriSysroots = fullMirSysroots;
         };
-        charon-unwrapped = pkgs.callPackage ./nix/charon.nix { inherit craneLib rustToolchain; enableWrapping = false; };
-        charon-portable = pkgs.runCommand "charon-portable" { } ''
+        charon = pkgs.runCommand "charon"
+          {
+            nativeBuildInputs = [ makeWrapper ]
+              # For `install_name_tool`.
+              ++ lib.optionals stdenv.isDarwin [ bintools ];
+            passthru = charon-unwrapped.passthru;
+          }
+          (''
+            cp -r ${charon-unwrapped} $out
+            chmod -R u+w $out
+
+            # Make sure the toolchain is in $PATH so that `cargo` can work
+            # properly. On mac we also have to tell `charon-driver` where to
+            # find the rustc_driver dynamic library; this is done automatically
+            # on linux.
+            wrapProgram $out/bin/charon \
+              --set CHARON_TOOLCHAIN_IS_IN_PATH 1 \
+              --set CHARON_MIRI_SYSROOTS "${fullMirSysroots}" \
+              --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ rustToolchain ]}" \
+              --prefix PATH : "${lib.makeBinPath [ rustToolchain ]}"
+          ''
+          + (lib.optionalString stdenv.isDarwin ''
+            # Ensures `charon-driver` finds the dylibs correctly.
+            install_name_tool -add_rpath "${rustToolchain}/lib" "$out/bin/charon-driver"
+          ''));
+        charon-portable = pkgs.runCommand "charon-portable" { } (''
           mkdir -p $out/bin
           cp ${charon-unwrapped}/bin/charon $out/bin/charon
           cp ${charon-unwrapped}/bin/charon-driver $out/bin/charon-driver
+        ''
+        + (lib.optionalString stdenv.isLinux ''
+          for f in $out/bin/*; do
+            chmod +w $f
+            ${pkgs.patchelf}/bin/patchelf --set-interpreter ${
+              {
+                x86_64-linux = "/lib64/ld-linux-x86-64.so.2";
+                aarch64-linux = "/lib/ld-linux-aarch64.so.1";
+              }.${system}
+            } $f || true
+            ${pkgs.patchelf}/bin/patchelf --remove-rpath $f || true
+          done
+        ''));
+        charon-release = pkgs.runCommand "charon-release"
+          {
+            nativeBuildInputs = lib.optionals stdenv.isLinux [ pkgs.binutils ];
+          }
+          (''
+          mkdir $out
+          cd $out
+          cp ${charon-portable}/bin/charon ${charon-portable}/bin/charon-driver .
+          cp ${./charon/rust-toolchain} rust-toolchain
+        ''
+        # Lower the glibc version the binaries require, so the release runs on
+        # any host with glibc >= ${releaseGlibcVersion} regardless of the
+        # (newer) glibc it was built against.
+        #
+        # We need to use `--clear-symbol-version` for `pidfd_getpid` and `pidfd_spawnp` because
+        # `polyfill-glibc` has no polyfill for them and refuses to process the binary when they
+        # carry a symbol version above ${releaseGlibcVersion}. Glibc versions before 2.39 did not
+        # have these symbols at all, but Rust only imports them weakly and will fall back to a
+        # different mechanism when these symbols are not available.
+        + lib.optionalString stdenv.isLinux ''
+          chmod +w charon charon-driver
+          for f in charon charon-driver; do
+            ${polyfill-glibc}/bin/polyfill-glibc \
+              --clear-symbol-version=pidfd_getpid,pidfd_spawnp \
+              --target-glibc=${releaseGlibcVersion} "$f"
+          done
 
-          if [[ "${pkgs.stdenv.hostPlatform.system}" == *"linux"* ]]; then
-            for f in $out/bin/*; do
-              chmod +w $f
-              ${pkgs.patchelf}/bin/patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 $f || true
-              ${pkgs.patchelf}/bin/patchelf --remove-rpath $f || true
-            done
+          # Sanity-check that the release binaries don't require a glibc newer
+          # than `releaseGlibcVersion`.
+          max="$(objdump -T charon charon-driver \
+            | grep -oE 'GLIBC_[0-9]+(\.[0-9]+)+' | sed 's/GLIBC_//' | sort -V | tail -1)"
+          echo "Highest required glibc symbol version: ''${max:-none}"
+          if [ -n "$max" ] && [ "$(printf '%s\n${releaseGlibcVersion}\n' "$max" | sort -V | tail -1)" != "${releaseGlibcVersion}" ]; then
+            echo "ERROR: charon-release requires glibc $max > ${releaseGlibcVersion}." >&2
+            exit 1
           fi
-        '';
-        charon-ml = pkgs.callPackage ./nix/charon-ml.nix { inherit charon; };
+        '');
+        ocamlPackages = pkgs.ocamlPackages.overrideScope (_: prev: {
+          visitors = (prev.visitors.override { version = "20260520"; }).overrideAttrs (_: {
+            src = pkgs.fetchFromGitLab {
+              owner = "fpottier";
+              repo = "visitors";
+              tag = "20260520";
+              domain = "gitlab.inria.fr";
+              hash = "sha256-QR/kxwojyFOFLeu1JKjBfgmq2xaGZHq8hB1YwVpRVYI=";
+            };
+          });
+        });
+
+        charon-ml = pkgs.callPackage ./nix/charon-ml.nix { inherit charon ocamlPackages; };
 
         # Check rust files are correctly formatted.
         charon-check-fmt = charon.passthru.check-fmt;
@@ -61,10 +147,15 @@
         # Runs charon on the whole rustc ui test suite.
         rustc-tests = pkgs.callPackage ./nix/rustc-tests.nix { inherit charon rustToolchain; };
 
+        zulip_bot = pkgs.callPackage ./nix/zulip_bot.nix {
+          inherit charon pkgs;
+          jailNixLib = jail-nix.lib;
+        };
+
         # Check that the generated ocaml files match what is committed to the repo.
-        check-generated-ml = pkgs.runCommand "check-generated-ml" { } ''
+        check-generated-asts = pkgs.runCommand "check-generated-asts" { } ''
           mkdir generated
-          cp ${charon}/generated-ml/* generated
+          cp ${charon}/generated-asts/* generated
           chmod u+w generated/*
           cp ${./charon-ml/.ocamlformat} .ocamlformat
           ${ocamlformat}/bin/ocamlformat --inplace --enable-outside-detected-project generated/*.ml
@@ -107,7 +198,7 @@
       in
       {
         packages = {
-          inherit charon charon-unwrapped charon-portable charon-ml rustToolchain;
+          inherit charon charon-unwrapped charon-portable charon-release charon-ml polyfill-glibc rustToolchain zulip_bot;
           charon-full-mir-sysroots = fullMirSysroots;
           inherit (rustc-tests) rustc-tests;
           default = charon;
@@ -140,6 +231,8 @@
             pkgs.openssl
             pkgs.glibc.out
             pkgs.glibc.static
+          ] ++ lib.optionals stdenv.isLinux [
+            pkgs.glibc.bin
           ];
 
           inputsFrom = [
@@ -174,7 +267,7 @@
         checks = {
           default = charon-ml-tests;
           inherit charon-ml-tests charon-check-fmt charon-check-no-rustc
-            charon-ml-check-fmt check-generated-ml test-charon-via-nix
+            charon-ml-check-fmt check-generated-asts test-charon-via-nix
             charon-check-clippy;
         };
 

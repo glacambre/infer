@@ -10,32 +10,33 @@ struct P {
 fn main()
 {
     let _0: (); // return
-    let s_1: P; // local
-    let r_2: *mut P; // local
+    let s: P; // local
+    let r: *mut P; // local
     let _3: &'1 mut P; // anonymous local
-    let fb_4: &'3 mut i32; // local
-    let whole_5: &'4 mut P; // local
+    let fb: &'3 mut i32; // local
+    let whole: &'4 mut P; // local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(s_1);
-        s_1 = P { a: const 0i32, b: const 0i32 };
-        storage_live(r_2);
+        storage_live(s);
+        s = P { a: const 0i32, b: const 0i32 };
+        storage_live(r);
         storage_live(_3);
-        _3 = &mut s_1;
-        r_2 = &raw mut (*_3);
+        _3 = &mut s;
+        r = &raw mut (*_3);
         storage_dead(_3);
-        storage_live(fb_4);
-        fb_4 = &mut ((*r_2)).b;
-        storage_live(whole_5);
-        whole_5 = &mut (*r_2);
-        ((*whole_5)).a = const 7i32;
-        (*fb_4) = const 8i32;
+        storage_live(fb);
+        fb = &mut (*r).b;
+        storage_live(whole);
+        whole = &mut (*r);
+        (*whole).a = const 7i32;
+        (*fb) = const 8i32;
         _0 = ();
-        storage_dead(whole_5);
-        storage_dead(fb_4);
-        storage_dead(r_2);
-        storage_dead(s_1);
+        storage_dead(whole);
+        storage_dead(fb);
+        storage_dead(r);
+        storage_dead(s);
         return;
     }
 }

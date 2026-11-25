@@ -1,7 +1,7 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -9,11 +9,11 @@ pub trait Destruct<Self>
 }
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -21,7 +21,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::cmp::impls::{impl Ord for u64}::min
-#[lang_item("cmp_ord_min")]
+#[diagnostic_item("cmp_ord_min")]
 pub fn impl_Ord_for_u64::min(_1: u64, _2: u64) -> u64
 where
     TraitClause0: (u64: Sized),
@@ -34,9 +34,11 @@ fn main()
     let _0: (); // return
     let _1: u64; // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_1)
     _1 = impl_Ord_for_u64::min[{built_in impl Sized for u64}, {built_in impl Destruct for u64}](const 1u64, const 2u64)
+    ↳⚡ unwind_continue
     storage_dead(_1)
     _0 = ()
     return

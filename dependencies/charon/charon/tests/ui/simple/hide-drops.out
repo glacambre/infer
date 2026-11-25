@@ -1,7 +1,7 @@
 # Final LLBC before serialization:
 
 // Full name: alloc::string::String
-#[lang_item("String")]
+#[lang_item(String)]
 pub opaque type String
 
 // Full name: alloc::string::String::{impl Destruct for String}::drop_glue
@@ -9,7 +9,7 @@ unsafe fn drop_glue<'_0>(_1: &'_0 mut String)
 = <opaque>
 
 // Full name: alloc::string::{String}::new
-#[lang_item("string_new")]
+#[diagnostic_item("string_new")]
 pub fn new() -> String
 = <opaque>
 
@@ -19,9 +19,13 @@ fn use_string(_1: String)
     let _0: (); // return
     let _1: String; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
     conditional_drop[drop_glue<'0>] _1
+    ↳⚡ storage_dead(_1)
+        unwind_continue
+    storage_dead(_1)
     return
 }
 
@@ -29,14 +33,18 @@ fn use_string(_1: String)
 fn main()
 {
     let _0: (); // return
-    let _s_1: String; // local
+    let _s: String; // local
 
+    storage_live(_0)
     _0 = ()
-    storage_live(_s_1)
-    _s_1 = new()
+    storage_live(_s)
+    _s = new()
+    ↳⚡ unwind_continue
+    fake_read(_s)
     _0 = ()
-    conditional_drop[drop_glue<'0>] _s_1
-    storage_dead(_s_1)
+    conditional_drop[drop_glue<'0>] _s
+    ↳⚡ unwind_continue
+    storage_dead(_s)
     return
 }
 

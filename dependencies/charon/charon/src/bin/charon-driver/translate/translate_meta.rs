@@ -2,8 +2,11 @@
 use itertools::Itertools;
 use rustc_middle::mir;
 use rustc_span::RemapPathScopeComponents;
-use std::cmp::Ord;
-use std::path::{Component, PathBuf};
+use std::{
+    cmp::Ord,
+    path::{Component, PathBuf},
+    sync::LazyLock,
+};
 
 use super::translate_crate::RustcItem;
 use super::translate_ctx::*;
@@ -50,6 +53,15 @@ impl<'tcx> TranslateCtx<'tcx> {
                             }
                             normalized
                         };
+                        // Find the cargo home directory: according to cargo docs and having a
+                        // look at the cargo source, it's either the `$CARGO_HOME` var or
+                        // `$HOME/.cargo`
+                        static CARGO_HOME: LazyLock<Option<PathBuf>> = LazyLock::new(|| {
+                            std::env::var("CARGO_HOME")
+                                .map(PathBuf::from)
+                                .ok()
+                                .or_else(|| std::env::home_dir().map(|p| p.join(".cargo")))
+                        });
                         // The path to files in the standard library may be full paths to
                         // somewhere in the sysroot or in the original toolchain source tree. This
                         // may depend on how the toolchain is installed (rustup vs nix), so we
@@ -67,24 +79,18 @@ impl<'tcx> TranslateCtx<'tcx> {
                             let mut rewritten_path: PathBuf = "/toolchain".into();
                             rewritten_path.extend(path);
                             rewritten_path
+                        } else if let Some(cargo_home) = &*CARGO_HOME
+                            && let Ok(path) = path.strip_prefix(cargo_home)
+                        {
+                            let mut rewritten_path: PathBuf = "/cargo".into();
+                            rewritten_path.extend(path);
+                            rewritten_path
+                        } else if let Ok(current_dir) = std::env::current_dir()
+                            && let Ok(path) = path.strip_prefix(current_dir)
+                        {
+                            path.to_path_buf()
                         } else {
-                            // Find the cargo home directory: according to cargo docs and having a
-                            // look at the cargo source, it's either the `$CARGO_HOME` var or
-                            // `$HOME/.cargo`
-                            let cargo_home = std::env::var("CARGO_HOME")
-                                .map(PathBuf::from)
-                                .ok()
-                                .or_else(|| std::env::home_dir().map(|p| p.join(".cargo")));
-                            if let Some(cargo_home) = cargo_home
-                                && let Ok(path) = path.strip_prefix(cargo_home)
-                            {
-                                // Avoid some more machine-dependent paths in the llbc output.
-                                let mut rewritten_path: PathBuf = "/cargo".into();
-                                rewritten_path.extend(path);
-                                rewritten_path
-                            } else {
-                                path
-                            }
+                            path
                         };
                         FileName::Local(path)
                     }
@@ -455,6 +461,54 @@ impl<'tcx> TranslateCtx<'tcx> {
 
 // Attributes
 impl<'tcx> TranslateCtx<'tcx> {
+    fn condition_parent_id(&mut self, def_id: &hax::DefId) -> Result<ItemId, String> {
+        if !matches!(
+            def_id.kind,
+            hax::DefKind::Fn | hax::DefKind::AssocFn | hax::DefKind::Closure
+        ) {
+            return Err(
+                "pre/postcondition attributes can only be applied to functions".to_string(),
+            );
+        }
+        let Some(parent_def_id) = def_id.parent(&self.hax_state) else {
+            return Err(
+                "a pre/postcondition must be nested directly inside a function".to_string(),
+            );
+        };
+        let parent_def = self.poly_hax_def(&parent_def_id).map_err(|err| err.msg)?;
+        let kind = match parent_def.kind() {
+            hax::FullDefKind::Fn { .. } | hax::FullDefKind::AssocFn { .. } => {
+                TransItemSourceKind::Fun
+            }
+            hax::FullDefKind::Closure { args, .. } => TransItemSourceKind::ClosureMethod(
+                super::translate_closures::translate_closure_kind(&args.kind),
+            ),
+            _ => {
+                return Err(
+                    "a pre/postcondition must be nested directly inside a function".to_string(),
+                );
+            }
+        };
+        if self.options.monomorphize_with_hax && parent_def.this().has_non_lt_param {
+            return Err(
+                "pre/postconditions on generic functions are not supported with `--monomorphize`"
+                    .to_string(),
+            );
+        }
+        let parent_src = if self.options.monomorphize_with_hax {
+            TransItemSource::monomorphic(parent_def.this(), kind)
+        } else {
+            TransItemSource::polymorphic(&parent_def_id, kind)
+        };
+        if let Some(parent_id) = self.id_map.get(&parent_src) {
+            Ok(*parent_id)
+        } else {
+            self.register_and_enqueue(&None, parent_src).ok_or_else(|| {
+                "failed to register the pre/postcondition's parent function".to_string()
+            })
+        }
+    }
+
     /// Parse a raw attribute to recognize our special `charon::*`, `aeneas::*` and `verify::*` attributes.
     fn parse_attr_from_raw(
         &mut self,
@@ -493,6 +547,14 @@ impl<'tcx> TranslateCtx<'tcx> {
             "exclude" if args.is_none() => Attribute::Exclude,
             // `#[charon::transparent]`
             "transparent" if args.is_none() => Attribute::Transparent,
+            // `#[charon::precondition]`
+            "precondition" if args.is_none() => {
+                Attribute::IsPrecondition(self.condition_parent_id(def_id)?)
+            }
+            // `#[charon::postcondition]`
+            "postcondition" if args.is_none() => {
+                Attribute::IsPostcondition(self.condition_parent_id(def_id)?)
+            }
             // `#[charon::rename("new_name")]`
             "rename" if let Some(attr) = args => {
                 let Some(attr) = attr
@@ -572,7 +634,10 @@ impl<'tcx> TranslateCtx<'tcx> {
             hir::Attribute::Parsed(hir_attrs::AttributeKind::DocComment { comment, .. }) => {
                 Some(Attribute::DocComment(comment.to_string()))
             }
-            hir::Attribute::Parsed(_) => None,
+            hir::Attribute::Parsed(attr) => self
+                .translate_rustc_attribute_kind(attr)
+                .ok()
+                .map(Attribute::Builtin),
             hir::Attribute::Unparsed(attr) => {
                 let raw_attr = RawAttribute {
                     path: attr.path.to_string(),
@@ -684,14 +749,22 @@ impl<'tcx> TranslateCtx<'tcx> {
         let span = def.source_span.as_ref().unwrap_or(&def.span);
         let span = self.translate_span(span);
         let is_local = def.def_id().is_local();
-        let (attr_info, lang_item) = if !item_src.is_derived_item()
+        let (attr_info, lang_item, diagnostic_item) = if !item_src.is_derived_item()
             || matches!(item_src.kind, TransItemSourceKind::ClosureMethod(..))
         {
             let attr_info = self.translate_attr_info(def);
-            let lang_item = def.lang_item.or(def.diagnostic_item).map(|s| s.to_string());
-            (attr_info, lang_item)
+            let lang_item = def
+                .def_id()
+                .as_real_def_id()
+                .and_then(|id| self.tcx.as_lang_item(id))
+                .map(|lang_item| {
+                    self.translate_rustc_lang_item(&lang_item)
+                        .expect("all rustc LangItem variants should be translated")
+                });
+            let diagnostic_item = def.diagnostic_item.map(|s| s.to_string());
+            (attr_info, lang_item, diagnostic_item)
         } else {
-            (AttrInfo::default(), None)
+            (AttrInfo::default(), None, None)
         };
 
         let opacity = if attr_info.attributes.iter().any(|attr| attr.is_exclude()) {
@@ -713,6 +786,7 @@ impl<'tcx> TranslateCtx<'tcx> {
             is_local,
             opacity,
             lang_item,
+            diagnostic_item,
         };
         self.cached_item_metas
             .insert(item_src.clone(), item_meta.clone());

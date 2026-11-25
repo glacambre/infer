@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -21,7 +21,7 @@ pub trait Destruct<Self>
 }
 
 // Full name: core::marker::Tuple
-#[lang_item("tuple_trait")]
+#[lang_item(Tuple)]
 pub trait Tuple<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -29,7 +29,7 @@ pub trait Tuple<Self>
 }
 
 // Full name: core::ops::function::FnOnce
-#[lang_item("fn_once")]
+#[lang_item(FnOnce)]
 pub trait FnOnce<Self, Args>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -42,7 +42,7 @@ pub trait FnOnce<Self, Args>
 }
 
 // Full name: core::ops::function::FnMut
-#[lang_item("fn_mut")]
+#[lang_item(FnMut)]
 pub trait FnMut<Self, Args>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -54,7 +54,7 @@ pub trait FnMut<Self, Args>
 }
 
 // Full name: core::ops::function::Fn
-#[lang_item("fn")]
+#[lang_item(Fn)]
 pub trait Fn<Self, Args>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -85,6 +85,7 @@ pub fn foo() -> &'static closure
     _6 = closure {  }
     _5 = &_6
     _4 = move _5
+    storage_live(_0)
     storage_live(_3)
     storage_live(_1)
     storage_live(_2)
@@ -94,6 +95,10 @@ pub fn foo() -> &'static closure
     _0 = &(*_1)
     storage_dead(_2)
     storage_dead(_1)
+    storage_dead(_3)
+    storage_dead(_6)
+    storage_dead(_5)
+    storage_dead(_4)
     return
 }
 
@@ -103,35 +108,49 @@ unsafe fn drop_glue<'_0>(_1: &'_0 mut closure)
     let _0: (); // return
     let _1: &'1 mut closure; // arg #1
 
+    storage_live(_0)
     _0 = ()
+    storage_dead(_1)
     return
 }
 
 // Full name: test_crate::foo::{impl Fn<(u32,)> for closure}::call
-fn call<'_0>(_1: &'_0 closure, tupled_args_2: (u32,)) -> u32
+fn call<'_0>(_1: &'_0 closure, tupled_args: (u32,)) -> u32
 {
     let _0: u32; // return
     let _1: &'1 closure; // arg #1
-    let tupled_args_2: (u32,); // arg #2
-    let x_3: u32; // local
+    let tupled_args: (u32,); // arg #2
+    let x: u32; // local
 
-    storage_live(x_3)
-    x_3 = move tupled_args_2.0
-    _0 = copy x_3
+    storage_live(_0)
+    storage_live(x)
+    x = move tupled_args.0
+    _0 = copy x
+    storage_dead(x)
+    storage_dead(tupled_args)
+    storage_dead(_1)
     return
 }
 
 // Full name: test_crate::foo::{impl FnMut<(u32,)> for closure}::call_mut
-fn call_mut<'_0>(state_1: &'_0 mut closure, args_2: (u32,)) -> u32
+fn call_mut<'_0>(state: &'_0 mut closure, args: (u32,)) -> u32
 {
     let _0: u32; // return
-    let state_1: &'_0 mut closure; // arg #1
-    let args_2: (u32,); // arg #2
+    let state: &'_0 mut closure; // arg #1
+    let args: (u32,); // arg #2
     let _3: &'0 closure; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
-    _3 = &(*state_1)
-    _0 = call<'2>(move _3, move args_2)
+    _3 = &(*state)
+    _0 = call<'2>(move _3, move args)
+    ↳⚡ storage_dead(_3)
+        storage_dead(args)
+        storage_dead(state)
+        unwind_continue
+    storage_dead(_3)
+    storage_dead(args)
+    storage_dead(state)
     return
 }
 
@@ -143,10 +162,27 @@ fn call_once(_1: closure, _2: (u32,)) -> u32
     let _2: (u32,); // arg #2
     let _3: &'1 mut closure; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
     _3 = &mut _1
     _0 = call_mut<'2>(move _3, move _2)
+    ↳⚡ drop[drop_glue<'3>] _1
+        ↳⚡ storage_dead(_3)
+            storage_dead(_2)
+            storage_dead(_1)
+            unwind_terminate
+        storage_dead(_3)
+        storage_dead(_2)
+        storage_dead(_1)
+        unwind_continue
     drop[drop_glue<'4>] _1
+    ↳⚡ storage_dead(_3)
+        storage_dead(_2)
+        storage_dead(_1)
+        unwind_continue
+    storage_dead(_3)
+    storage_dead(_2)
+    storage_dead(_1)
     return
 }
 

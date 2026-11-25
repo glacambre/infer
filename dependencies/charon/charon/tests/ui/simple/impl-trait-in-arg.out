@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -36,9 +36,13 @@ where
     let _0: (); // return
     let _1: T0; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
     conditional_drop[{built_in impl Destruct for T0}::drop_glue<'0>] _1
+    ↳⚡ storage_dead(_1)
+        unwind_continue
+    storage_dead(_1)
     return
 }
 

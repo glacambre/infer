@@ -3,7 +3,7 @@
 opaque type core::marker::MetaSized::{vtable}
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 struct test_crate::Trait::{vtable} {
@@ -23,13 +23,15 @@ trait Trait<Self>
 }
 
 // Full name: test_crate::foo
-fn foo<'_0>(x_1: &'_0 (dyn Trait + '_0))
+fn foo<'_0>(x: &'_0 (dyn Trait + '_0))
 {
     let _0: (); // return
-    let x_1: &'3 (dyn Trait + '4); // arg #1
+    let x: &'3 (dyn Trait + '4); // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
+    storage_dead(x)
     return
 }
 

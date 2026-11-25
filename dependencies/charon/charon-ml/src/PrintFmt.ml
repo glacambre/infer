@@ -101,12 +101,25 @@ let uchar_to_utf8 (c : Uchar.t) : string =
       | 2 -> cont (i lsr 6)
       | _ -> cont i)
 
+(* Mirror Rust's `char::escape_debug` *)
+let escape_char_debug (c : Uchar.t) : string =
+  let i = Uchar.to_int c in
+  match i with
+  | 0x09 -> "\\t"
+  | 0x0a -> "\\n"
+  | 0x0d -> "\\r"
+  | 0x5c -> "\\\\"
+  | 0x27 -> "\\'"
+  | 0x22 -> "\\\""
+  | _ when i >= 0x20 && i <= 0x7e -> uchar_to_utf8 c
+  | _ -> Printf.sprintf "\\u{%x}" i
+
 let pp_literal (fmt : Format.formatter) (lit : literal) : unit =
   match lit with
   | VScalar sv -> pp_scalar_value fmt sv
   | VFloat fv -> pp_float_value fmt fv
   | VBool b -> pp_string fmt (Bool.to_string b)
-  | VChar c -> pp_string fmt (uchar_to_utf8 c)
+  | VChar c -> Format.fprintf fmt "'%s'" (escape_char_debug c)
   | VStr s -> Format.fprintf fmt "\"%s\"" (escape_string s)
   | VByteStr bs ->
       Format.fprintf fmt "[%a]"
@@ -605,7 +618,9 @@ and pp_ty (env : fmt_env) (fmt : Format.formatter) (ty : ty) : unit =
       | RShared -> Format.fprintf fmt "*const %a" (pp_ty env) rty)
   | TFnPtr binder ->
       let env = fmt_env_push_regions env binder.binder_regions in
-      let { inputs; output; is_unsafe; abi } = binder.binder_value in
+      let { inputs; output; is_unsafe; abi; is_variadic } =
+        binder.binder_value
+      in
       let unsafe = if is_unsafe then "unsafe " else "" in
       let abi = abi_prefix abi in
       Format.fprintf fmt "%s%sfn" unsafe abi;
@@ -614,7 +629,10 @@ and pp_ty (env : fmt_env) (fmt : Format.formatter) (ty : ty) : unit =
           (pp_sep_list ", " (fun fmt region ->
                pp_string fmt (region_param_to_string env region)))
           binder.binder_regions;
-      Format.fprintf fmt "(%a)" (pp_sep_list ", " (pp_ty env)) inputs;
+      if is_variadic && inputs = [] then Format.fprintf fmt "(...)"
+      else if is_variadic then
+        Format.fprintf fmt "(%a, ...)" (pp_sep_list ", " (pp_ty env)) inputs
+      else Format.fprintf fmt "(%a)" (pp_sep_list ", " (pp_ty env)) inputs;
       if not (ty_is_unit output) then
         Format.fprintf fmt " -> %a" (pp_ty env) output
   | TFnDef f ->
@@ -976,26 +994,15 @@ and adt_field_names (env : fmt_env) (def_id : TypeDeclId.id)
   | Some { kind = Opaque; _ } -> None
   | Some def ->
       let fields = type_decl_get_fields def opt_variant_id in
-      (* There are two cases: either all the fields have names, or none
-         of them has names *)
-      let has_names =
-        List.exists (fun f -> Option.is_some f.field_name) fields
-      in
-      if has_names then
-        let fields = List.map (fun f -> Option.get f.field_name) fields in
-        Some fields
-      else None
+      Some (List.map (fun f -> f.field_name) fields)
 
 let pp_field (env : fmt_env) (fmt : Format.formatter) (f : field) : unit =
-  match f.field_name with
-  | Some field_name ->
-      Format.fprintf fmt "%s: %s" field_name (ty_to_string env f.field_ty)
-  | None -> pp_string fmt (ty_to_string env f.field_ty)
+  Format.fprintf fmt "%s: %s" f.field_name (ty_to_string env f.field_ty)
 
 let pp_variant (env : fmt_env) (fmt : Format.formatter) (v : variant) : unit =
   if v.fields = [] then pp_string fmt v.variant_name
   else
-    Format.fprintf fmt "%s(%a)" v.variant_name
+    Format.fprintf fmt "%s { %a }" v.variant_name
       (pp_sep_list ", " (pp_field env))
       v.fields
 
@@ -1106,11 +1113,25 @@ let pp_item_intro (env : fmt_env) (indent : string) (keyword : string)
   let lang_item =
     match meta.lang_item with
     | None -> ""
-    | Some id -> indent ^ "#[lang_item(\"" ^ id ^ "\")]\n"
+    | Some id ->
+        let id = show_rustc_lang_item id in
+        (* The derived printer includes the generated OCaml module and variant prefix. *)
+        let prefix = "Generated_Types.RustcLangItem" in
+        assert (String.starts_with ~prefix id);
+        let id =
+          String.sub id (String.length prefix)
+            (String.length id - String.length prefix)
+        in
+        indent ^ "#[lang_item(" ^ id ^ ")]\n"
+  in
+  let diagnostic_item =
+    match meta.diagnostic_item with
+    | None -> ""
+    | Some id -> indent ^ "#[diagnostic_item(\"" ^ id ^ "\")]\n"
   in
   let public = if meta.attr_info.public then "pub " else "" in
-  Format.fprintf fmt "%s%s%s%s%s %s" full_name_comment lang_item indent public
-    keyword name
+  Format.fprintf fmt "%s%s%s%s%s%s %s" full_name_comment lang_item
+    diagnostic_item indent public keyword name
 
 let item_intro_to_string env indent keyword id meta =
   pp_to_string (fun fmt -> pp_item_intro env indent keyword id fmt meta)
@@ -1173,23 +1194,53 @@ let adt_field_to_string (env : fmt_env) (def_id : TypeDeclId.id)
   | Some def ->
       let fields = type_decl_get_fields def opt_variant_id in
       let field = FieldId.nth fields field_id in
-      field.field_name
+      Some field.field_name
 
 let local_id_to_pretty_string (id : local_id) : string =
   "_" ^ LocalId.to_string id
 
-let local_to_string (v : local) : string =
+let local_to_string_with_id (v : local) : string =
   match v.name with
   | None -> "_" ^ LocalId.to_string v.index
   | Some name -> name ^ "_" ^ LocalId.to_string v.index
 
+let local_to_string (v : local) : string = local_to_string_with_id v
+
+let compute_local_names (locals : locals) : (local_id * string option) list =
+  let name_counts = Hashtbl.create (List.length locals.locals * 2) in
+  let add_count name =
+    let count =
+      match Hashtbl.find_opt name_counts name with
+      | None -> 0
+      | Some count -> count
+    in
+    Hashtbl.replace name_counts name (count + 1)
+  in
+  List.iter
+    (fun (local : local) ->
+      add_count (local_to_string_with_id local);
+      match local.name with
+      | None -> ()
+      | Some name -> add_count name)
+    locals.locals;
+  List.map
+    (fun (local : local) ->
+      let name =
+        match local.name with
+        | Some name when name <> "" && Hashtbl.find name_counts name = 1 -> name
+        | _ -> local_to_string_with_id local
+      in
+      (local.index, Some name))
+    locals.locals
+
+let fmt_env_set_locals (env : fmt_env) (locals : locals) : fmt_env =
+  { env with locals = compute_local_names locals }
+
 let local_id_to_string (env : fmt_env) (id : LocalId.id) : string =
   match List.find_opt (fun (i, _) -> i = id) env.locals with
   | None -> local_id_to_pretty_string id
-  | Some (_, name) -> (
-      match name with
-      | None -> local_id_to_pretty_string id
-      | Some name -> name ^ "_" ^ LocalId.to_string id)
+  | Some (_, None) -> local_id_to_pretty_string id
+  | Some (_, Some name) -> name
 
 let rec pp_projection_elem (env : fmt_env) (sub : string)
     (fmt : Format.formatter) (pe : projection_elem) : unit =
@@ -1213,7 +1264,7 @@ let rec pp_projection_elem (env : fmt_env) (sub : string)
         | None -> FieldId.to_string fid
       in
       match opt_variant_id with
-      | None -> Format.fprintf fmt "(%s).%s" sub field_name
+      | None -> Format.fprintf fmt "%s.%s" sub field_name
       | Some variant_id ->
           Format.fprintf fmt "(%s as variant %a).%s" sub
             (pp_adt_variant env adt_id)
@@ -1463,6 +1514,26 @@ let pp_assertion (env : fmt_env) (fmt : Format.formatter) (a : assertion) : unit
     (Bool.to_string a.expected)
     check_kind
 
+let pp_borrowck_statement (env : fmt_env) (fmt : Format.formatter)
+    (statement : borrowck_statement) : unit =
+  match statement with
+  | FakeRead place -> Format.fprintf fmt "fake_read(%a)" (pp_place env) place
+  | SetType (place, ty, variance) ->
+      let relation =
+        match variance with
+        | Covariant -> "<="
+        | Contravariant -> ">="
+        | Invariant -> "=="
+        | Bivariant | VaUnknown -> assert false
+      in
+      Format.fprintf fmt "set_type(typeof(%a) %s %s)" (pp_place env) place
+        relation (ty_to_string env ty)
+  | SetOutlives (ty, region) ->
+      Format.fprintf fmt "set_outlives(%s, %s)" (ty_to_string env ty)
+        (region_to_string env region)
+  | PredicateHolds predicate ->
+      Format.fprintf fmt "predicate_holds(%a)" (pp_trait_ref env) predicate
+
 let pp_abort_kind (env : fmt_env) (fmt : Format.formatter) (a : abort_kind) :
     unit =
   match a with
@@ -1523,8 +1594,11 @@ let pp_fun_sig_with_name (env : fmt_env) (indent : string)
     | None -> ""
     | Some name -> " " ^ name
   in
-  Format.fprintf fmt "%s%s%s%sfn%s%s(%t)%s%s" indent attribute unsafe abi name
-    params pp_args ret_ty clauses
+  let variadic =
+    if not sg.is_variadic then "" else if sg.inputs = [] then "..." else ", ..."
+  in
+  Format.fprintf fmt "%s%s%s%sfn%s%s(%t%s)%s%s" indent attribute unsafe abi name
+    params pp_args variadic ret_ty clauses
 
 let pp_fun_sig (env : fmt_env) (indent : string) (indent_incr : string)
     (fmt : Format.formatter) (sg : fun_sig item_binder) : unit =
@@ -1542,6 +1616,8 @@ let pp_fun_sig (env : fmt_env) (indent : string) (indent_incr : string)
   pp_sep_list ", "
     (fun fmt ty -> pp_string fmt (ty_to_string env ty))
     fmt sg.inputs;
+  if sg.is_variadic then
+    pp_string fmt (if sg.inputs = [] then "..." else ", ...");
   pp_string fmt ")";
   if not (ty_is_unit sg.output) then
     Format.fprintf fmt " -> %s" (ty_to_string env sg.output);
@@ -1549,6 +1625,7 @@ let pp_fun_sig (env : fmt_env) (indent : string) (indent_incr : string)
 
 let pp_locals (env : fmt_env) (indent : string) (fmt : Format.formatter)
     (locals : locals) : unit =
+  let env = fmt_env_set_locals env locals in
   let pp_local_decl fmt var =
     let kind =
       if var.index = LocalId.zero then "return"
@@ -1559,7 +1636,8 @@ let pp_locals (env : fmt_env) (indent : string) (fmt : Format.formatter)
         | Some _ -> "local"
         | None -> "anonymous local"
     in
-    Format.fprintf fmt "%slet %s: %s; // %s" indent (local_to_string var)
+    Format.fprintf fmt "%slet %s: %s; // %s" indent
+      (local_id_to_string env var.index)
       (ty_to_string env var.local_ty)
       kind
   in
@@ -1749,6 +1827,7 @@ module Llbc = struct
   let pp_print_fn_ptr = pp_fn_ptr
   let pp_print_rvalue = pp_rvalue
   let pp_print_assertion = pp_assertion
+  let pp_print_borrowck_statement = pp_borrowck_statement
   let pp_print_abort_kind = pp_abort_kind
 
   open LlbcAst
@@ -1760,21 +1839,44 @@ module Llbc = struct
       st.comments_before;
     pp_statement_kind env indent indent_incr fmt st.kind
 
+  and pp_unwind_block (env : fmt_env) (indent : string) (indent_incr : string)
+      (fmt : Format.formatter) (on_unwind : block) : unit =
+    let block =
+      pp_to_string (fun fmt -> pp_block env "" indent_incr fmt on_unwind)
+    in
+    let lines =
+      match List.rev (String.split_on_char '\n' block) with
+      | "" :: lines -> List.rev lines
+      | lines -> List.rev lines
+    in
+    match lines with
+    | [] -> ()
+    | first :: rest ->
+        Format.fprintf fmt "\n%s↳⚡ %s" indent first;
+        let indent = indent ^ indent_incr in
+        List.iter (fun line -> Format.fprintf fmt "\n%s%s" indent line) rest
+
+  and pp_branch_block (env : fmt_env) (indent : string) (indent_incr : string)
+      (fmt : Format.formatter) (label : string) (block : block) : unit =
+    let indent1 = indent ^ indent_incr in
+    Format.fprintf fmt "\n%s%s => {\n%a%s}" indent label
+      (pp_block env indent1 indent_incr)
+      block indent
+
   and pp_statement_kind (env : fmt_env) (indent : string) (indent_incr : string)
       (fmt : Format.formatter) (st : statement_kind) : unit =
     match st with
     | Assign (p, rv) ->
         Format.fprintf fmt "%s%a = %a" indent (pp_print_place env) p
           (pp_print_rvalue env) rv
+    | Borrowck statement ->
+        Format.fprintf fmt "%s%a" indent
+          (pp_print_borrowck_statement env)
+          statement
     | SetDiscriminant (p, variant_id) ->
         Format.fprintf fmt "%s@discriminant(%s) = %s" indent
           (place_to_string env p)
           (VariantId.to_string variant_id)
-    | CopyNonOverlapping { src; dst; count } ->
-        Format.fprintf fmt "%scopy_nonoverlapping(%s, %s, %s)" indent
-          (operand_to_string env src)
-          (operand_to_string env dst)
-          (operand_to_string env count)
     | StorageLive var_id ->
         Format.fprintf fmt "%sstorage_live(%s)" indent
           (local_id_to_string env var_id)
@@ -1783,40 +1885,44 @@ module Llbc = struct
           (local_id_to_string env var_id)
     | PlaceMention place ->
         Format.fprintf fmt "%s_ = %s" indent (place_to_string env place)
-    | Drop (p, fn_ptr, kind) ->
+    | Drop (p, fn_ptr, kind, on_unwind) ->
         let kind =
           match kind with
           | Precise -> "drop"
           | Conditional -> "conditional_drop"
         in
-        Format.fprintf fmt "%s%s[%a] %s" indent kind (pp_print_fn_ptr env)
+        Format.fprintf fmt "%s%s[%a] %s%a" indent kind (pp_print_fn_ptr env)
           fn_ptr (place_to_string env p)
-    | Assert (asrt, abort_kind) ->
-        Format.fprintf fmt "%s%a else %a" indent (pp_print_assertion env) asrt
-          (pp_print_abort_kind env) abort_kind
-    | InlineAsm (asm, [ target ]) ->
+          (pp_unwind_block env indent indent_incr)
+          on_unwind
+    | Assert (asrt, on_failure, on_unwind) ->
+        Format.fprintf fmt "%s%a else %a%a" indent (pp_print_assertion env) asrt
+          (pp_print_abort_kind env) on_failure
+          (pp_unwind_block env indent indent_incr)
+          on_unwind
+    | InlineAsm (asm, targets, on_unwind) ->
         Format.fprintf fmt "%sasm!(%S)" indent asm;
-        List.iter
-          (fun st ->
-            Format.fprintf fmt "\n%a" (pp_statement env indent indent_incr) st)
-          target.statements
-    | InlineAsm (asm, targets) ->
-        Format.fprintf fmt "%sasm!(%S)" indent asm;
-        if targets <> [] then (
+        if targets = [] then
+          pp_unwind_block env indent indent_incr fmt on_unwind
+        else
           let indent1 = indent ^ indent_incr in
-          let indent2 = indent1 ^ indent_incr in
           Format.fprintf fmt " {";
           List.iteri
             (fun i target ->
-              Format.fprintf fmt "\n%starget %d => {\n%a%s}" indent1 i
-                (pp_block env indent2 indent_incr)
-                target indent1)
+              pp_branch_block env indent1 indent_incr fmt
+                ("target " ^ string_of_int i)
+                target)
             targets;
-          Format.fprintf fmt "\n%s}" indent)
-    | Call call -> pp_print_call env indent fmt call
+          Format.fprintf fmt "\n%s}" indent;
+          pp_unwind_block env indent indent_incr fmt on_unwind
+    | Call (call, on_unwind) ->
+        Format.fprintf fmt "%a%a" (pp_print_call env indent) call
+          (pp_unwind_block env indent indent_incr)
+          on_unwind
     | Abort kind ->
         Format.fprintf fmt "%s%a" indent (pp_print_abort_kind env) kind
     | Return -> Format.fprintf fmt "%sreturn" indent
+    | UnwindResume -> Format.fprintf fmt "%sunwind_continue" indent
     | Break i -> Format.fprintf fmt "%sbreak %d" indent i
     | Continue i -> Format.fprintf fmt "%scontinue %d" indent i
     | Nop -> Format.fprintf fmt "%snop" indent
@@ -1909,80 +2015,105 @@ module Ullbc = struct
   let pp_print_place = pp_place
   let pp_print_rvalue = pp_rvalue
   let pp_print_assertion = pp_assertion
+  let pp_print_borrowck_statement = pp_borrowck_statement
   let pp_print_abort_kind = pp_abort_kind
 
   open UllbcAst
 
   let rec pp_statement (env : fmt_env) (indent : string)
       (fmt : Format.formatter) (st : statement) : unit =
+    List.iter
+      (fun line -> Format.fprintf fmt "%s// %s\n" indent line)
+      st.comments_before;
     pp_statement_kind env indent fmt st.kind
 
   and pp_statement_kind (env : fmt_env) (indent : string)
       (fmt : Format.formatter) (st : statement_kind) : unit =
     match st with
     | Assign (p, rv) ->
-        Format.fprintf fmt "%s%a := %a" indent (pp_print_place env) p
+        Format.fprintf fmt "%s%a = %a" indent (pp_print_place env) p
           (pp_print_rvalue env) rv
+    | Borrowck statement ->
+        Format.fprintf fmt "%s%a" indent
+          (pp_print_borrowck_statement env)
+          statement
     | SetDiscriminant (p, variant_id) ->
-        (* TODO: improve this to lookup the variant name by using the def id
-           (we are missing the def id here) *)
-        Format.fprintf fmt "%sset_discriminant(%s, %s)" indent
+        Format.fprintf fmt "%s@discriminant(%s) = %s" indent
           (place_to_string env p)
           (variant_id_to_pretty_string variant_id)
     | Assert (asrt, abort_kind) ->
         Format.fprintf fmt "%s%a else %a" indent (pp_print_assertion env) asrt
           (pp_print_abort_kind env) abort_kind
     | StorageLive var_id ->
-        Format.fprintf fmt "%sstorage_live %s" indent
+        Format.fprintf fmt "%sstorage_live(%s)" indent
           (local_id_to_string env var_id)
     | StorageDead var_id ->
-        Format.fprintf fmt "%sstorage_dead %s" indent
+        Format.fprintf fmt "%sstorage_dead(%s)" indent
           (local_id_to_string env var_id)
     | PlaceMention place ->
-        Format.fprintf fmt "%s_ := %s" indent (place_to_string env place)
-    | CopyNonOverlapping { src; dst; count } ->
-        Format.fprintf fmt "%scopy_non_overlapping(%s, %s, %s)" indent
-          (operand_to_string env src)
-          (operand_to_string env dst)
-          (operand_to_string env count)
-    | Nop -> pp_string fmt "nop"
+        Format.fprintf fmt "%s_ = %s" indent (place_to_string env place)
+    | Nop -> Format.fprintf fmt "%snop" indent
 
   let pp_switch (indent : string) (fmt : Format.formatter) (tgt : switch) : unit
       =
     match tgt with
     | If (b0, b1) ->
-        Format.fprintf fmt "%s[true -> %s; false -> %s]" indent
+        Format.fprintf fmt "%strue -> %s else -> %s" indent
           (block_id_to_string b0) (block_id_to_string b1)
     | SwitchInt (_int_ty, branches, otherwise) ->
-        Format.fprintf fmt "%s[" indent;
-        List.iter
-          (fun (sv, bid) ->
-            Format.fprintf fmt "%a -> %s; " pp_print_literal sv
-              (block_id_to_string bid))
-          branches;
-        Format.fprintf fmt "_ -> %s]" (block_id_to_string otherwise)
+        let targets =
+          List.map
+            (fun (sv, bid) ->
+              pp_to_string (fun fmt -> pp_print_literal fmt sv)
+              ^ ": " ^ block_id_to_string bid)
+            branches
+          @ [ "otherwise: " ^ block_id_to_string otherwise ]
+        in
+        Format.fprintf fmt "%s%s" indent (String.concat ", " targets)
 
   let rec pp_terminator (env : fmt_env) (indent : string)
       (fmt : Format.formatter) (st : terminator) : unit =
+    List.iter
+      (fun line -> Format.fprintf fmt "%s// %s\n" indent line)
+      st.comments_before;
     pp_terminator_kind env indent fmt st.kind
 
   and pp_terminator_kind (env : fmt_env) (indent : string)
       (fmt : Format.formatter) (st : terminator_kind) : unit =
     match st with
     | Goto bid -> Format.fprintf fmt "%sgoto %s" indent (block_id_to_string bid)
-    | Switch (op, tgts) ->
-        Format.fprintf fmt "%sswitch %s%a" indent (operand_to_string env op)
-          (pp_switch indent) tgts
+    | Switch (op, If (true_block, false_block)) ->
+        Format.fprintf fmt "%sif %s -> %s else -> %s" indent
+          (operand_to_string env op)
+          (block_id_to_string true_block)
+          (block_id_to_string false_block)
+    | Switch (op, SwitchInt (_int_ty, branches, otherwise)) ->
+        let targets =
+          List.map
+            (fun (sv, bid) ->
+              pp_to_string (fun fmt -> pp_print_literal fmt sv)
+              ^ ": " ^ block_id_to_string bid)
+            branches
+          @ [ "otherwise: " ^ block_id_to_string otherwise ]
+        in
+        Format.fprintf fmt "%sswitch %s -> %s" indent (operand_to_string env op)
+          (String.concat ", " targets)
     | Call (call, tgt, unwind) ->
-        Format.fprintf fmt "%a -> %s(unwind:%s)" (pp_print_call env indent) call
+        Format.fprintf fmt "%a -> %s (unwind: %s)" (pp_print_call env indent)
+          call (block_id_to_string tgt)
+          (block_id_to_string unwind)
+    | Drop (kind, p, fn_ptr, tgt, unwind) ->
+        let kind =
+          match kind with
+          | Precise -> "drop"
+          | Conditional -> "conditional_drop"
+        in
+        Format.fprintf fmt "%s%s[%a] %s -> %s (unwind: %s)" indent kind
+          (pp_fn_ptr env) fn_ptr (place_to_string env p)
           (block_id_to_string tgt)
           (block_id_to_string unwind)
-    | Drop (_, p, _, tgt, unwind) ->
-        Format.fprintf fmt "%sdrop %s -> %s(unwind:%s)" indent
-          (place_to_string env p) (block_id_to_string tgt)
-          (block_id_to_string unwind)
     | TAssert (asrt, tgt, unwind) ->
-        Format.fprintf fmt "%s%a -> %s(unwind:%s)" indent
+        Format.fprintf fmt "%sassert %a -> %s (unwind: %s)" indent
           (pp_print_assertion env) asrt (block_id_to_string tgt)
           (block_id_to_string unwind)
     | InlineAsm (asm, targets, on_unwind) ->
@@ -1995,14 +2126,15 @@ module Ullbc = struct
         let targets = targets @ [ "unwind: " ^ block_id_to_string on_unwind ] in
         Format.fprintf fmt "%sasm!(%S) -> %s" indent asm
           (String.concat ", " targets)
-    | Abort _ -> Format.fprintf fmt "%spanic" indent
+    | Abort kind ->
+        Format.fprintf fmt "%s%a" indent (pp_print_abort_kind env) kind
     | Return -> Format.fprintf fmt "%sreturn" indent
     | UnwindResume -> Format.fprintf fmt "%sunwind_continue" indent
 
   let pp_block (env : fmt_env) (indent : string) (indent_incr : string)
       (fmt : Format.formatter) (id : BlockId.id) (block : block) : unit =
     let indent1 = indent ^ indent_incr in
-    Format.fprintf fmt "%s%s {\n" indent (block_id_to_string id);
+    Format.fprintf fmt "%s%s: {\n" indent (block_id_to_string id);
     List.iter
       (fun st -> Format.fprintf fmt "%a;\n" (pp_statement env indent1) st)
       block.statements;
@@ -2051,9 +2183,10 @@ let pp_fun_decl (env : fmt_env) (indent : string) (indent_incr : string)
   in
   let n_args = List.length def.signature.inputs in
   let args_of_locals (locals : locals) =
+    let env = fmt_env_set_locals env locals in
     locals.locals |> List.tl
     |> Collections.List.prefix n_args
-    |> List.map local_to_string
+    |> List.map (fun var -> local_id_to_string env var.index)
   in
   let arg_names =
     match def.body with
@@ -2079,14 +2212,16 @@ let pp_fun_decl (env : fmt_env) (indent : string) (indent_incr : string)
     (fun fmt (ty, name) ->
       Format.fprintf fmt "%s: %s" name (ty_to_string env ty))
     fmt args;
+  if def.signature.is_variadic then
+    if def.signature.inputs = [] then Format.fprintf fmt "..."
+    else Format.fprintf fmt ", ...";
   pp_string fmt ")";
   if not (ty_is_unit def.signature.output) then
     Format.fprintf fmt " -> %s" (ty_to_string env def.signature.output);
   pp_string fmt clauses;
   match def.body with
   | StructuredBody { locals; body; _ } ->
-      let env_locals = List.map (fun v -> (v.index, v.name)) locals.locals in
-      let env = { env with locals = env_locals } in
+      let env = fmt_env_set_locals env locals in
       let body_indent = indent ^ indent_incr in
       Format.fprintf fmt "\n%s{\n%a\n\n%a%s}" indent
         (pp_locals env body_indent)
@@ -2094,8 +2229,7 @@ let pp_fun_decl (env : fmt_env) (indent : string) (indent_incr : string)
         (pp_llbc_block env body_indent indent_incr)
         body indent
   | UnstructuredBody { locals; body; _ } ->
-      let env_locals = List.map (fun v -> (v.index, v.name)) locals.locals in
-      let env = { env with locals = env_locals } in
+      let env = fmt_env_set_locals env locals in
       let body_indent = indent ^ indent_incr in
       Format.fprintf fmt "\n%s{\n%a\n\n%a\n%s}" indent
         (pp_locals env body_indent)

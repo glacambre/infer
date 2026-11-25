@@ -1,4 +1,4 @@
-use derive_generic_visitor::{Drive, DriveMut, Visit, VisitMut};
+use derive_generic_visitor::{Drive, DriveMut, DriveTwo, Visit, VisitMut, VisitTwo};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::ops::{ControlFlow, Deref};
@@ -24,6 +24,18 @@ impl<T> Clone for HashConsed<T> {
 impl<T> HashConsed<T> {
     pub fn inner(&self) -> &T {
         self.0.0.as_ref()
+    }
+}
+
+impl<T: PartialOrd> PartialOrd for HashConsed<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.inner().partial_cmp(other.inner())
+    }
+}
+
+impl<T: Ord> Ord for HashConsed<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.inner().cmp(other.inner())
     }
 }
 
@@ -197,6 +209,11 @@ impl<T: std::fmt::Debug> std::fmt::Debug for HashConsed<T> {
 impl<'s, T, V: Visit<'s, T>> Drive<'s, V> for HashConsed<T> {
     fn drive_inner(&'s self, v: &mut V) -> ControlFlow<V::Break> {
         v.visit(self.inner())
+    }
+}
+impl<'s, T, V: VisitTwo<'s, T>> DriveTwo<'s, V> for HashConsed<T> {
+    fn drive_two_inner(&'s self, other: &'s Self, v: &mut V) -> ControlFlow<V::Break> {
+        v.visit(self.inner(), other.inner())
     }
 }
 /// Note: this explores the inner value mutably by cloning and re-hashing afterwards.

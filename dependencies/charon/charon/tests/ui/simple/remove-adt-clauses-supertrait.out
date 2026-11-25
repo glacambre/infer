@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -21,7 +21,7 @@ pub trait Destruct<Self>
 }
 
 // Full name: core::marker::Tuple
-#[lang_item("tuple_trait")]
+#[lang_item(Tuple)]
 pub trait Tuple<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -29,7 +29,7 @@ pub trait Tuple<Self>
 }
 
 // Full name: core::ops::function::FnOnce
-#[lang_item("fn_once")]
+#[lang_item(FnOnce)]
 pub trait FnOnce<Self, Args, Self_Output>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -67,31 +67,39 @@ trait Child<Self>
 struct closure<T> {}
 
 // Full name: test_crate::make
-fn make<T>(x_1: T) -> closure<T>
+fn make<T>(x: T) -> closure<T>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Child),
 {
     let _0: closure<T>; // return
-    let x_1: T; // arg #1
+    let x: T; // arg #1
 
+    storage_live(_0)
+    fake_read(x)
     _0 = closure {  }
-    conditional_drop[{built_in impl Destruct for T}::drop_glue<'0>] x_1
+    conditional_drop[{built_in impl Destruct for T}::drop_glue<'0>] x
+    ↳⚡ storage_dead(x)
+        unwind_continue
+    storage_dead(x)
     return
 }
 
 // Full name: test_crate::make::{impl FnOnce<(), ()> for closure<T>}::call_once
-fn call_once<T>(_1: closure<T>, tupled_args_2: ())
+fn call_once<T>(_1: closure<T>, tupled_args: ())
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Child),
 {
     let _0: (); // return
     let _1: closure<T>; // arg #1
-    let tupled_args_2: (); // arg #2
+    let tupled_args: (); // arg #2
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
+    storage_dead(tupled_args)
+    storage_dead(_1)
     return
 }
 

@@ -23,17 +23,15 @@ define int_comparison::compare(x_1: int, y_2: int) : int {
       prune n4
       n5:int = load &x_1
       store &var_0 <- n5:int
-      jmp node_3
+      n6:int = load &var_0
+      ret n6
       
   #node_2:
       prune __sil_lnot(n4)
-      n6:int = load &y_2
-      store &var_0 <- n6:int
-      jmp node_3
-      
-  #node_3:
-      n7:int = load &var_0
-      ret n7
+      n7:int = load &y_2
+      store &var_0 <- n7:int
+      n8:int = load &var_0
+      ret n8
       
 }
 

@@ -179,7 +179,7 @@ impl TransformCtx {
         for id in self.translated.all_ids() {
             if let Some(mut decl) = self.translated.remove_item_temporarily(id) {
                 f(self, decl.as_mut());
-                self.translated.set_item_slot(id, decl);
+                self.translated.put_item_back(id, decl);
             }
         }
     }
@@ -296,8 +296,8 @@ pub trait BodyTransformCtx: Sized {
                             .get_crate()
                             .trait_decls
                             .get(tref.id)
-                            .and_then(|decl| decl.item_meta.lang_item.clone())
-                            == Some("sized".into())
+                            .and_then(|decl| decl.item_meta.lang_item.as_ref())
+                            == Some(&from_rustc::LangItem::Sized)
                     {
                         return true;
                     }

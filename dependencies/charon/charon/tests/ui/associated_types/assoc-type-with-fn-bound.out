@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Tuple
-#[lang_item("tuple_trait")]
+#[lang_item(Tuple)]
 pub trait Tuple<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -21,7 +21,7 @@ pub trait Tuple<Self>
 }
 
 // Full name: core::ops::function::FnOnce
-#[lang_item("fn_once")]
+#[lang_item(FnOnce)]
 pub trait FnOnce<Self, Args, Self_Output>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -33,7 +33,7 @@ pub trait FnOnce<Self, Args, Self_Output>
 }
 
 // Full name: core::ops::function::FnMut
-#[lang_item("fn_mut")]
+#[lang_item(FnMut)]
 pub trait FnMut<Self, Args, Self_Clause1_Output>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -45,7 +45,7 @@ pub trait FnMut<Self, Args, Self_Clause1_Output>
 }
 
 // Full name: core::ops::function::Fn
-#[lang_item("fn")]
+#[lang_item(Fn)]
 pub trait Fn<Self, Args, Self_Clause1_Clause1_Output>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -67,24 +67,29 @@ pub trait Trait<Self, Self_Foo>
 }
 
 // Full name: test_crate::{impl Trait<F> for F}::call
-pub fn call<'_0, F>(self_1: &'_0 F)
+pub fn call<'_0, F>(self: &'_0 F)
 where
     TraitClause0: (F: Fn<(), ()>),
     TraitClause1: (F: Sized),
+    TypeOutlives0: F: '_0,
 {
     let _0: (); // return
-    let self_1: &'1 F; // arg #1
+    let self: &'1 F; // arg #1
     let _2: &'2 F; // anonymous local
     let _3: (); // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_2)
-    _2 = &(*self_1)
+    _2 = &(*self)
     storage_live(_3)
     _3 = ()
     _0 = TraitClause0::call<'3>(move _2, move _3)
+    ↳⚡ storage_dead(self)
+        unwind_continue
     storage_dead(_3)
     storage_dead(_2)
+    storage_dead(self)
     return
 }
 
@@ -106,6 +111,7 @@ pub fn use_foo()
 {
     let _0: (); // return
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
     return

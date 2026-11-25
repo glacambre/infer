@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,8 @@ pub trait Sized<Self>
 }
 
 // Full name: core::clone::Clone
-#[lang_item("clone")]
+#[lang_item(Clone)]
+#[diagnostic_item("Clone")]
 pub trait Clone<Self>
 {
     proof ImpliedClause0: (Self: Sized)
@@ -22,7 +23,8 @@ pub trait Clone<Self>
 }
 
 // Full name: core::marker::Copy
-#[lang_item("copy")]
+#[lang_item(Copy)]
+#[diagnostic_item("Copy")]
 pub trait Copy<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -31,7 +33,7 @@ pub trait Copy<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -47,17 +49,23 @@ trait Trait<Self>
 }
 
 // Full name: test_crate::{impl Trait for ()}::method
-fn method<T>(self_1: (), _other_2: T)
+fn method<T>(self: (), _other: T)
 where
     TraitClause0: (T: Sized),
 {
     let _0: (); // return
-    let self_1: (); // arg #1
-    let _other_2: T; // arg #2
+    let self: (); // arg #1
+    let _other: T; // arg #2
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
-    conditional_drop[{built_in impl Destruct for T}::drop_glue<'0>] _other_2
+    conditional_drop[{built_in impl Destruct for T}::drop_glue<'0>] _other
+    ↳⚡ storage_dead(_other)
+        storage_dead(self)
+        unwind_continue
+    storage_dead(_other)
+    storage_dead(self)
     return
 }
 
@@ -75,11 +83,13 @@ fn main()
     let _1: (); // anonymous local
     let _2: (); // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_1)
     storage_live(_2)
     _2 = ()
     _1 = method<bool>[{built_in impl Sized for bool}](move _2, const false)
+    ↳⚡ unwind_continue
     storage_dead(_2)
     storage_dead(_1)
     _0 = ()

@@ -638,6 +638,7 @@ fn remove_unmentioned_methods(krate: &mut TranslatedCrate) {
                     item_id: AssocItemId::Method(_),
                     ..
                 }
+                | ItemSource::Spec { .. }
                 | ItemSource::TargetDependent { .. } => {}
                 // Functions that aren't any of the above are reachable. target-dependent functions
                 // will be reachable if their dispatcher is.
@@ -649,6 +650,14 @@ fn remove_unmentioned_methods(krate: &mut TranslatedCrate) {
             let _ = fun.body.drive(&mut MentionedFunVisitor(|n| {
                 graph.add_edge(fun_node, n, ());
             }));
+        }
+
+        for trait_decl in krate.trait_decls.iter() {
+            for (method_id, method) in trait_decl.methods.iter_enumerated() {
+                if method.skip_binder.default.is_none() {
+                    graph.add_edge(Root, Method((trait_decl.def_id, method_id)), ());
+                }
+            }
         }
 
         graph

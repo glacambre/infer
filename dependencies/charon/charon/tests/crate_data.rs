@@ -1,3 +1,4 @@
+use charon_lib::ast::from_rustc;
 use charon_lib::llbc_ast::*;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -56,6 +57,83 @@ fn type_decl() -> anyhow::Result<()> {
     assert_eq!(
         repr_name(&crate_data, &crate_data.type_decls[0].item_meta.name),
         "test_crate::Struct"
+    );
+    Ok(())
+}
+
+#[test]
+fn generic_parameter_variance() -> anyhow::Result<()> {
+    let crate_data = translate(
+        r#"
+        use std::marker::PhantomData;
+
+        struct Covariant<'a, T>(&'a T);
+        struct Invariant<'a, T>(&'a mut T);
+        struct Contravariant<'a, T>(PhantomData<fn(&'a T)>);
+        trait NoVarianceInformation<'a, T> {}
+        fn late_bound(x: &u8, y: &mut &u8) {}
+        fn nested<'a>(_: for<'b> fn(&'a u8, &'b u8)) {}
+        "#,
+    )?;
+    let items = items_by_name(&crate_data);
+
+    let variance = |item_name: &str| {
+        let generics = &items[item_name].generics;
+        (
+            generics
+                .regions
+                .iter()
+                .map(|param| param.variance)
+                .collect_vec(),
+            generics
+                .types
+                .iter()
+                .map(|param| param.variance)
+                .collect_vec(),
+        )
+    };
+
+    assert_eq!(
+        variance("test_crate::Covariant"),
+        (vec![Variance::Covariant], vec![Variance::Covariant])
+    );
+    assert_eq!(
+        variance("test_crate::Invariant"),
+        (vec![Variance::Covariant], vec![Variance::Invariant])
+    );
+    assert_eq!(
+        variance("test_crate::Contravariant"),
+        (vec![Variance::Contravariant], vec![Variance::Contravariant])
+    );
+    assert_eq!(
+        variance("test_crate::NoVarianceInformation"),
+        (
+            vec![Variance::Unknown],
+            vec![Variance::Unknown, Variance::Unknown]
+        )
+    );
+    assert_eq!(
+        variance("test_crate::late_bound"),
+        (
+            vec![
+                Variance::Covariant,
+                Variance::Covariant,
+                Variance::Invariant
+            ],
+            vec![]
+        )
+    );
+    assert_eq!(
+        variance("test_crate::nested"),
+        (vec![Variance::Contravariant], vec![])
+    );
+    let nested = items["test_crate::nested"].kind.as_fun().unwrap();
+    let TyKind::FnPtr(signature) = nested.signature.inputs[0].kind() else {
+        panic!("expected a function pointer")
+    };
+    assert_eq!(
+        signature.regions[RegionId::ZERO].variance,
+        Variance::Covariant
     );
     Ok(())
 }
@@ -328,21 +406,116 @@ fn attributes() -> anyhow::Result<()> {
         crate_data.fun_decls[0].item_meta.attr_info.inline,
         Some(InlineAttr::Never)
     );
-    assert_eq!(
-        crate_data.fun_decls[0]
-            .item_meta
-            .attr_info
-            .attributes
-            .last()
-            .unwrap(),
-        &Attribute::DocComment(" This is a doc comment.".to_owned())
-    );
+    let attrs = &crate_data.fun_decls[0].item_meta.attr_info.attributes;
+    assert!(attrs.contains(&Attribute::DocComment(" This is a doc comment.".to_owned())));
+    assert!(attrs.iter().any(|attr| matches!(
+        attr,
+        Attribute::Builtin(from_rustc::AttributeKind::Inline(
+            from_rustc::InlineAttr::Never,
+            _
+        ))
+    )));
     // Check that the `inline` attribute on closures gets picked up.
     let any_inline_always = crate_data
         .fun_decls
         .iter()
         .any(|decl| matches!(decl.item_meta.attr_info.inline, Some(InlineAttr::Always)));
     assert!(any_inline_always);
+    Ok(())
+}
+
+#[test]
+fn function_conditions() -> anyhow::Result<()> {
+    let crate_data = translate(
+        r#"
+        #![feature(register_tool)]
+        #![register_tool(charon)]
+
+        fn function() {
+            #[charon::precondition]
+            fn precondition() -> bool { true }
+
+            #[charon::postcondition]
+            fn postcondition() -> bool { true }
+
+            let closure = || {
+                #[charon::precondition]
+                fn closure_precondition() -> bool { true }
+            };
+            closure();
+        }
+        "#,
+    )?;
+    let items = items_by_name(&crate_data);
+    let function = items["test_crate::function"].kind.as_fun().unwrap();
+    let precondition = items["test_crate::function::precondition"]
+        .kind
+        .as_fun()
+        .unwrap();
+    let postcondition = items["test_crate::function::postcondition"]
+        .kind
+        .as_fun()
+        .unwrap();
+
+    assert_eq!(
+        precondition.src,
+        ItemSource::Spec {
+            kind: SpecKind::Precondition,
+            item: function.def_id.into(),
+        }
+    );
+    assert_eq!(
+        postcondition.src,
+        ItemSource::Spec {
+            kind: SpecKind::Postcondition,
+            item: function.def_id.into(),
+        }
+    );
+    assert!(
+        function
+            .item_meta
+            .attr_info
+            .attributes
+            .contains(&Attribute::HasPrecondition(precondition.def_id))
+    );
+    assert!(
+        function
+            .item_meta
+            .attr_info
+            .attributes
+            .contains(&Attribute::HasPostcondition(postcondition.def_id))
+    );
+    let closure_precondition = crate_data
+        .fun_decls
+        .iter()
+        .find(|decl| {
+            decl.def_id != precondition.def_id
+                && decl
+                    .item_meta
+                    .attr_info
+                    .attributes
+                    .iter()
+                    .any(Attribute::is_is_precondition)
+        })
+        .unwrap();
+    let ItemSource::Spec {
+        kind: SpecKind::Precondition,
+        item: parent_id,
+    } = closure_precondition.src
+    else {
+        panic!("expected a precondition spec item")
+    };
+    let parent = crate_data.get_item(parent_id).unwrap();
+    let parent = parent.as_fun().unwrap();
+
+    assert!(matches!(parent.src, ItemSource::TraitImpl { .. }));
+    assert!(
+        parent
+            .item_meta
+            .attr_info
+            .attributes
+            .contains(&Attribute::HasPrecondition(closure_precondition.def_id))
+    );
     Ok(())
 }
 
@@ -681,12 +854,14 @@ fn known_trait_method_call() -> anyhow::Result<()> {
         "test_crate::use_default"
     );
     let body = &function.body.as_structured().unwrap().body;
-    let [first_stmt, ..] = body.statements.as_slice() else {
-        panic!()
-    };
-    let StatementKind::Call(call) = &first_stmt.kind else {
-        panic!()
-    };
+    let call = body
+        .statements
+        .iter()
+        .find_map(|stmt| match &stmt.kind {
+            StatementKind::Call { call, .. } => Some(call),
+            _ => None,
+        })
+        .unwrap();
     let FnOperand::Regular(fn_ptr) = &call.func else {
         panic!()
     };

@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -52,7 +52,7 @@ where
     TraitClause1: (T: HasBlockSize<Clause1_BlockSize, Clause1_Clause2_Output>),
     TraitClause2: (Clause1_Clause2_Output: Bound),
 {
-  T,
+  _0: T,
 }
 
 // Full name: test_crate::foo
@@ -65,6 +65,7 @@ where
 {
     let _0: Wrapper<Clause1_ReaderCore, Clause1_Clause2_BlockSize, Clause1_Clause2_Clause2_Output>[TraitClause1::ImpliedClause1, TraitClause1::ImpliedClause2, TraitClause3]; // return
 
+    storage_live(_0)
     panic(core::panicking::panic)
 }
 

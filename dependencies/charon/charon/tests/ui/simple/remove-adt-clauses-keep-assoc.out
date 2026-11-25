@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -35,7 +35,7 @@ where
     TraitClause0: (T: Sized),
     TraitClause1: (T: HasAssoc),
 {
-  T,
+  _0: T,
 }
 
 // Full name: test_crate::Direct::{impl Destruct for Direct<T>[TraitClause0, TraitClause1]}::drop_glue
@@ -43,12 +43,17 @@ unsafe fn impl_Destruct_for_Direct::drop_glue<'_0, T>(_1: &'_0 mut Direct<T>[Tra
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: HasAssoc),
+    TypeOutlives0: T: '_0,
 {
     let _0: (); // return
     let _1: &'1 mut Direct<T>[TraitClause0, TraitClause1]; // arg #1
 
+    storage_live(_0)
     _0 = ()
-    drop[{built_in impl Destruct for T}::drop_glue<'2>] ((*_1)).0
+    drop[{built_in impl Destruct for T}::drop_glue<'2>] (*_1)._0
+    ↳⚡ storage_dead(_1)
+        unwind_continue
+    storage_dead(_1)
     return
 }
 
@@ -85,7 +90,7 @@ where
     TraitClause0: (T: Sized),
     TraitClause1: (T: DerivedNoAssoc),
 {
-  T,
+  _0: T,
 }
 
 // Full name: test_crate::Transitive::{impl Destruct for Transitive<T>[TraitClause0, TraitClause1]}::drop_glue
@@ -93,12 +98,17 @@ unsafe fn impl_Destruct_for_Transitive::drop_glue<'_0, T>(_1: &'_0 mut Transitiv
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: DerivedNoAssoc),
+    TypeOutlives0: T: '_0,
 {
     let _0: (); // return
     let _1: &'1 mut Transitive<T>[TraitClause0, TraitClause1]; // arg #1
 
+    storage_live(_0)
     _0 = ()
-    drop[{built_in impl Destruct for T}::drop_glue<'2>] ((*_1)).0
+    drop[{built_in impl Destruct for T}::drop_glue<'2>] (*_1)._0
+    ↳⚡ storage_dead(_1)
+        unwind_continue
+    storage_dead(_1)
     return
 }
 
@@ -129,7 +139,7 @@ trait MarkerChild<Self>
 
 // Full name: test_crate::Marker
 struct Marker<T> {
-  T,
+  _0: T,
 }
 
 // Full name: test_crate::Marker::{impl Destruct for Marker<T>}::drop_glue
@@ -137,12 +147,17 @@ unsafe fn impl_Destruct_for_Marker::drop_glue<'_0, T>(_1: &'_0 mut Marker<T>)
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: MarkerChild),
+    TypeOutlives0: T: '_0,
 {
     let _0: (); // return
     let _1: &'1 mut Marker<T>; // arg #1
 
+    storage_live(_0)
     _0 = ()
-    drop[{built_in impl Destruct for T}::drop_glue<'2>] ((*_1)).0
+    drop[{built_in impl Destruct for T}::drop_glue<'2>] (*_1)._0
+    ↳⚡ storage_dead(_1)
+        unwind_continue
+    storage_dead(_1)
     return
 }
 
@@ -157,7 +172,7 @@ where
 }
 
 // Full name: test_crate::use_all
-fn use_all<T, U, V>(_x_1: Direct<T>[TraitClause0, TraitClause3], _y_2: Transitive<U>[TraitClause1, TraitClause4], _z_3: Marker<V>)
+fn use_all<T, U, V>(_x: Direct<T>[TraitClause0, TraitClause3], _y: Transitive<U>[TraitClause1, TraitClause4], _z: Marker<V>)
 where
     TraitClause0: (T: Sized),
     TraitClause1: (U: Sized),
@@ -167,15 +182,46 @@ where
     TraitClause5: (V: MarkerChild),
 {
     let _0: (); // return
-    let _x_1: Direct<T>[TraitClause0, TraitClause3]; // arg #1
-    let _y_2: Transitive<U>[TraitClause1, TraitClause4]; // arg #2
-    let _z_3: Marker<V>; // arg #3
+    let _x: Direct<T>[TraitClause0, TraitClause3]; // arg #1
+    let _y: Transitive<U>[TraitClause1, TraitClause4]; // arg #2
+    let _z: Marker<V>; // arg #3
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
-    conditional_drop[impl_Destruct_for_Marker::drop_glue<'0, V>[TraitClause2, TraitClause5]] _z_3
-    conditional_drop[impl_Destruct_for_Transitive::drop_glue<'1, U>[TraitClause1, TraitClause4]] _y_2
-    conditional_drop[impl_Destruct_for_Direct::drop_glue<'3, T>[TraitClause0, TraitClause3]] _x_1
+    conditional_drop[impl_Destruct_for_Marker::drop_glue<'0, V>[TraitClause2, TraitClause5]] _z
+    ↳⚡ conditional_drop[impl_Destruct_for_Transitive::drop_glue<'2, U>[TraitClause1, TraitClause4]] _y
+        ↳⚡ storage_dead(_z)
+            storage_dead(_y)
+            storage_dead(_x)
+            unwind_terminate
+        conditional_drop[impl_Destruct_for_Direct::drop_glue<'4, T>[TraitClause0, TraitClause3]] _x
+        ↳⚡ storage_dead(_z)
+            storage_dead(_y)
+            storage_dead(_x)
+            unwind_terminate
+        storage_dead(_z)
+        storage_dead(_y)
+        storage_dead(_x)
+        unwind_continue
+    conditional_drop[impl_Destruct_for_Transitive::drop_glue<'1, U>[TraitClause1, TraitClause4]] _y
+    ↳⚡ conditional_drop[impl_Destruct_for_Direct::drop_glue<'4, T>[TraitClause0, TraitClause3]] _x
+        ↳⚡ storage_dead(_z)
+            storage_dead(_y)
+            storage_dead(_x)
+            unwind_terminate
+        storage_dead(_z)
+        storage_dead(_y)
+        storage_dead(_x)
+        unwind_continue
+    conditional_drop[impl_Destruct_for_Direct::drop_glue<'3, T>[TraitClause0, TraitClause3]] _x
+    ↳⚡ storage_dead(_z)
+        storage_dead(_y)
+        storage_dead(_x)
+        unwind_continue
+    storage_dead(_z)
+    storage_dead(_y)
+    storage_dead(_x)
     return
 }
 

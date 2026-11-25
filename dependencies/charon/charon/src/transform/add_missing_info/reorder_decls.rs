@@ -7,6 +7,7 @@
 //! to be explicit about mutual recursion. This should come useful for translation to any other
 //! language with these properties.
 use crate::common::*;
+use crate::options::TranslateOptions;
 use crate::transform::TransformCtx;
 use crate::ullbc_ast::*;
 use derive_generic_visitor::*;
@@ -288,9 +289,10 @@ impl VisitAst for DepsForItem<'_> {
         self.insert_edge(*id);
     }
 
-    fn visit_item_meta(&mut self, _: &ItemMeta) -> ControlFlow<Self::Break> {
-        // Don't look inside because trait impls contain their own id in their name.
-        Continue(())
+    fn visit_item_meta(&mut self, meta: &ItemMeta) -> ControlFlow<Self::Break> {
+        // Don't visit the name because trait impls contain their own id in it. Attributes however
+        // can contain genuine dependencies, notably between an item and its specifications.
+        meta.attr_info.drive(self)
     }
     fn visit_item_source(&mut self, _: &ItemSource) -> ControlFlow<Self::Break> {
         // Don't look inside to avoid recording a dependency from a method impl to the impl block
@@ -331,7 +333,7 @@ fn compute_declarations_graph(ctx: &TransformCtx) -> DiGraphMap<ItemId, ()> {
             ItemRef::Fun(d) => {
                 let FunDecl {
                     def_id,
-                    item_meta: _,
+                    item_meta,
                     generics,
                     signature,
                     src,
@@ -339,6 +341,7 @@ fn compute_declarations_graph(ctx: &TransformCtx) -> DiGraphMap<ItemId, ()> {
                     body,
                 } = d;
                 let _ = def_id.drive(&mut visitor); // For `seen_current_id`
+                let _ = item_meta.attr_info.drive(&mut visitor);
                 // Skip `d.is_global_initializer` to avoid incorrect mutual dependencies.
                 // TODO: add `is_global_initializer` to `ItemSource`.
                 let _ = generics.drive(&mut visitor);
@@ -426,7 +429,13 @@ fn compute_reordered_decls(ctx: &mut TransformCtx) -> DeclarationsGroups {
         let item_meta = item.item_meta();
         let span = item_meta.span.data;
         let file_name_order = sorted_file_ids.get(span.file_id);
-        (item_meta.is_local, file_name_order, span.beg, item.id())
+        (
+            item_meta.is_local,
+            file_name_order,
+            span.beg,
+            item_meta.name.mono_args().cloned(),
+            item.id(),
+        )
     };
     // We record for each item the order in which we're sorting it, to make `sort_by` cheap.
     let item_sorted_index: HashMap<ItemId, usize> = ctx
@@ -469,6 +478,10 @@ fn compute_reordered_decls(ctx: &mut TransformCtx) -> DeclarationsGroups {
 
 pub struct Transform;
 impl TransformPass for Transform {
+    fn should_run(&self, options: &TranslateOptions) -> bool {
+        !options.no_reorder_decls
+    }
+
     fn transform_ctx(&self, ctx: &mut TransformCtx) {
         let reordered_decls = compute_reordered_decls(ctx);
         ctx.translated.ordered_decls = Some(reordered_decls);

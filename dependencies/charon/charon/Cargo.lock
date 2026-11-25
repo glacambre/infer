@@ -115,12 +115,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
-name = "arrayvec"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
-
-[[package]]
 name = "assert_cmd"
 version = "2.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -198,15 +192,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
 
 [[package]]
-name = "brownstone"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5839ee4f953e811bfdcf223f509cb2c6a3e1447959b0bff459405575bc17f22"
-dependencies = [
- "arrayvec",
-]
-
-[[package]]
 name = "bstr"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -252,14 +237,13 @@ checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
 
 [[package]]
 name = "charon"
-version = "0.1.216"
+version = "0.1.233"
 dependencies = [
  "annotate-snippets",
  "anstream",
  "anyhow",
  "assert_cmd",
  "clap",
- "colored",
  "convert_case",
  "crates_io_api",
  "derive_generic_visitor",
@@ -274,13 +258,13 @@ dependencies = [
  "index_vec",
  "indexmap",
  "indoc",
- "itertools",
+ "itertools 0.13.0",
  "lazy_static",
+ "libc",
  "libtest-mimic",
  "log",
  "macros",
  "nom",
- "nom-supreme",
  "num-bigint",
  "paste",
  "petgraph",
@@ -375,16 +359,6 @@ name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
-
-[[package]]
-name = "colored"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
-dependencies = [
- "lazy_static",
- "windows-sys 0.59.0",
-]
 
 [[package]]
 name = "convert_case"
@@ -524,22 +498,23 @@ dependencies = [
 
 [[package]]
 name = "derive_generic_visitor"
-version = "0.2.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21588db07753dafe6460b13faad18bd7e46548ce91ee38f0bc0f7529b3864b82"
+checksum = "113505c87000bf21b0bce35e7b9a381c220aba032d4a99a37e4ff90bb47e0e40"
 dependencies = [
  "derive_generic_visitor_macros",
+ "itertools 0.14.0",
 ]
 
 [[package]]
 name = "derive_generic_visitor_macros"
-version = "0.2.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3aed1890235ebcf844a24263ecc395c4e57a970f13bcc9948989f22aa051aa7"
+checksum = "31474cd9f8a0a127e855afe40e8d9c6bd99c5e6538b3f8715214ee06036954ee"
 dependencies = [
  "convert_case",
  "darling",
- "itertools",
+ "itertools 0.13.0",
  "proc-macro2 1.0.96",
  "quote 1.0.40",
  "syn 2.0.104",
@@ -933,7 +908,7 @@ dependencies = [
 name = "hax-adt-into"
 version = "0.3.5"
 dependencies = [
- "itertools",
+ "itertools 0.13.0",
  "proc-macro2 1.0.96",
  "quote 1.0.40",
  "syn 1.0.109",
@@ -1208,12 +1183,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "indent_write"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cfe9645a18782869361d9c8732246be7b410ad4e919d3609ebabdac00ba12c3"
-
-[[package]]
 name = "index_vec"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1282,6 +1251,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1310,12 +1288,6 @@ dependencies = [
  "quote 1.0.40",
  "syn 2.0.104",
 ]
-
-[[package]]
-name = "joinery"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72167d68f5fce3b8655487b8038691a3c9984ee769590f93f2a631f4ad64e4f5"
 
 [[package]]
 name = "js-sys"
@@ -1471,19 +1443,6 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
-]
-
-[[package]]
-name = "nom-supreme"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bd3ae6c901f1959588759ff51c95d24b491ecb9ff91aa9c2ef4acc5b1dcab27"
-dependencies = [
- "brownstone",
- "indent_write",
- "joinery",
- "memchr",
- "nom",
 ]
 
 [[package]]
@@ -1990,7 +1949,7 @@ checksum = "94300abf3f1ae2e2b8ffb7b58043de3d399c73fa6f4b73826402a5c457614dbe"
 name = "rustc_trait_elaboration"
 version = "0.1.0"
 dependencies = [
- "itertools",
+ "itertools 0.13.0",
  "rustc-hash",
  "tracing",
 ]

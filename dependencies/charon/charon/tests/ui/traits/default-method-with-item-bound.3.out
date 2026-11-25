@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -40,19 +40,22 @@ trait Exact<Self>
     non-dyn-compatible
 }
 
-fn test_crate::Trait::defaulted<'_0, Self, P>(self_1: &'_0 Self)
+fn test_crate::Trait::defaulted<'_0, Self, P>(self: &'_0 Self)
 where
     TraitClause0: (Self: Trait),
     TraitClause1: (P: Sized),
     TraitClause2: (P: HasAssoc<TraitClause0::Item>),
     TraitClause3: (Self: Exact),
+    TypeOutlives0: Self: '_0,
     TypeConstraint0: TraitClause2::Assoc = bool,
 {
     let _0: (); // return
-    let self_1: &'1 Self; // arg #1
+    let self: &'1 Self; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
+    storage_dead(self)
     return
 }
 
@@ -61,23 +64,26 @@ struct Empty<T>
 where
     TraitClause0: (T: Sized),
 {
-  T,
+  _0: T,
 }
 
 // Full name: test_crate::{impl Trait for Empty<T>[TraitClause0]}::defaulted
-fn impl_Trait_for_Empty::defaulted<'_0, T, P>(self_1: &'_0 Empty<T>[TraitClause0])
+fn impl_Trait_for_Empty::defaulted<'_0, T, P>(self: &'_0 Empty<T>[TraitClause0])
 where
     TraitClause0: (T: Sized),
     TraitClause1: (P: Sized),
     TraitClause2: (P: HasAssoc<T>),
     TraitClause3: (Empty<T>[TraitClause0]: Exact),
+    TypeOutlives0: T: '_0,
     TypeConstraint0: TraitClause2::Assoc = bool,
 {
     let _0: (); // return
-    let self_1: &'1 Empty<T>[TraitClause0]; // arg #1
+    let self: &'1 Empty<T>[TraitClause0]; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
+    storage_dead(self)
     return
 }
 

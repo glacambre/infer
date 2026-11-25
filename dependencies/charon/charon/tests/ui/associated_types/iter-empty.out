@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -49,20 +49,27 @@ trait Iter<Self, Self_Item>
     non-dyn-compatible
 }
 
-fn test_crate::Iter::map<'_0, Self, B, F, Clause0_Item>(self_1: &'_0 mut Self, _f_2: F)
+fn test_crate::Iter::map<'_0, Self, B, F, Clause0_Item>(self: &'_0 mut Self, _f: F)
 where
     TraitClause0: (Self: Iter<Clause0_Item>),
     TraitClause1: (B: Sized),
     TraitClause2: (F: Sized),
     TraitClause3: (F: Apply<Clause0_Item, B>),
+    TypeOutlives0: Self: '_0,
 {
     let _0: (); // return
-    let self_1: &'1 mut Self; // arg #1
-    let _f_2: F; // arg #2
+    let self: &'1 mut Self; // arg #1
+    let _f: F; // arg #2
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
-    conditional_drop[{built_in impl Destruct for F}::drop_glue<'2>] _f_2
+    conditional_drop[{built_in impl Destruct for F}::drop_glue<'2>] _f
+    ↳⚡ storage_dead(_f)
+        storage_dead(self)
+        unwind_continue
+    storage_dead(_f)
+    storage_dead(self)
     return
 }
 
@@ -71,24 +78,31 @@ struct Empty<T>
 where
     TraitClause0: (T: Sized),
 {
-  [T; 0usize],
+  _0: [T; 0usize],
 }
 
 // Full name: test_crate::{impl Iter<T> for Empty<T>[TraitClause0]}::map
-fn impl_Iter_for_Empty::map<'_0, T, B, F>(self_1: &'_0 mut Empty<T>[TraitClause0], _f_2: F)
+fn impl_Iter_for_Empty::map<'_0, T, B, F>(self: &'_0 mut Empty<T>[TraitClause0], _f: F)
 where
     TraitClause0: (T: Sized),
     TraitClause1: (B: Sized),
     TraitClause2: (F: Sized),
     TraitClause3: (F: Apply<T, B>),
+    TypeOutlives0: T: '_0,
 {
     let _0: (); // return
-    let self_1: &'1 mut Empty<T>[TraitClause0]; // arg #1
-    let _f_2: F; // arg #2
+    let self: &'1 mut Empty<T>[TraitClause0]; // arg #1
+    let _f: F; // arg #2
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
-    conditional_drop[{built_in impl Destruct for F}::drop_glue<'2>] _f_2
+    conditional_drop[{built_in impl Destruct for F}::drop_glue<'2>] _f
+    ↳⚡ storage_dead(_f)
+        storage_dead(self)
+        unwind_continue
+    storage_dead(_f)
+    storage_dead(self)
     return
 }
 
@@ -113,18 +127,20 @@ fn g()
     let _4: [(); 0usize]; // anonymous local
     let _5: F; // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_1)
     storage_live(_2)
     storage_live(_3)
     storage_live(_4)
     _4 = []
-    _3 = Empty { 0: move _4 }
+    _3 = Empty { _0: move _4 }
     _2 = &two-phase-mut _3
     storage_dead(_4)
     storage_live(_5)
     _5 = F {  }
     _1 = impl_Iter_for_Empty::map<'3, (), (), F>[{built_in impl Sized for ()}, {built_in impl Sized for ()}, {built_in impl Sized for F}, impl_Apply_unit_for_F](move _2, move _5)
+    ↳⚡ unwind_continue
     storage_dead(_5)
     storage_dead(_2)
     storage_dead(_3)

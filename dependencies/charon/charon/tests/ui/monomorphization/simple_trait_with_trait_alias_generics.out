@@ -3,11 +3,11 @@
 opaque type core::marker::MetaSized::{vtable}
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -41,6 +41,7 @@ fn f::<i32>()
 {
     let _0: (); // return
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
     return
@@ -52,9 +53,11 @@ fn main()
     let _0: (); // return
     let _1: (); // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_1)
     _1 = f::<i32>()
+    ↳⚡ unwind_continue
     storage_dead(_1)
     _0 = ()
     return

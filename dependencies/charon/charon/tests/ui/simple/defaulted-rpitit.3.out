@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::iter::sources::empty::Empty
-#[lang_item("IterEmpty")]
+#[diagnostic_item("IterEmpty")]
 pub opaque type Empty<T>
 where
     TraitClause0: (T: Sized),
@@ -25,17 +25,19 @@ where
 = <opaque>
 
 // Full name: core::option::Option
-#[lang_item("Option")]
+#[lang_item(Option)]
+#[diagnostic_item("Option")]
 pub enum Option<T>
 where
     TraitClause0: (T: Sized),
 {
   None,
-  Some(T),
+  Some { _0: T },
 }
 
 // Full name: core::iter::traits::iterator::Iterator
-#[lang_item("iterator")]
+#[lang_item(Iterator)]
+#[diagnostic_item("Iterator")]
 pub trait Iterator<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -59,26 +61,35 @@ pub trait MyTrait<Self, T>
     non-dyn-compatible
 }
 
-pub fn test_crate::MyTrait::rows<'_0, Self, T>(self_1: &'_0 Self) -> Empty<T>[TraitClause0::ImpliedClause1]
+pub fn test_crate::MyTrait::rows<'_0, Self, T>(self: &'_0 Self) -> Empty<T>[TraitClause0::ImpliedClause1]
 where
     TraitClause0: (Self: MyTrait<T>),
+    TypeOutlives0: Self: '_0,
 {
     let _0: Empty<T>[TraitClause0::ImpliedClause1]; // return
-    let self_1: &'1 Self; // arg #1
+    let self: &'1 Self; // arg #1
 
+    storage_live(_0)
     _0 = empty<T>[TraitClause0::ImpliedClause1]()
+    ↳⚡ storage_dead(self)
+        unwind_continue
+    storage_dead(self)
     return
 }
 
 // Full name: test_crate::{impl MyTrait<T> for ()}::rows
-pub fn impl_MyTrait_for_unit::rows<'_0, T>(self_1: &'_0 ()) -> Empty<T>[impl_MyTrait_for_unit<T>[TraitClause0]::ImpliedClause1]
+pub fn impl_MyTrait_for_unit::rows<'_0, T>(self: &'_0 ()) -> Empty<T>[impl_MyTrait_for_unit<T>[TraitClause0]::ImpliedClause1]
 where
     TraitClause0: (T: Sized),
 {
     let _0: Empty<T>[impl_MyTrait_for_unit<T>[TraitClause0]::ImpliedClause1]; // return
-    let self_1: &'1 (); // arg #1
+    let self: &'1 (); // arg #1
 
+    storage_live(_0)
     _0 = empty<T>[impl_MyTrait_for_unit<T>[TraitClause0]::ImpliedClause1]()
+    ↳⚡ storage_dead(self)
+        unwind_continue
+    storage_dead(self)
     return
 }
 

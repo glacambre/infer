@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,8 @@ pub trait Sized<Self>
 }
 
 // Full name: core::clone::Clone
-#[lang_item("clone")]
+#[lang_item(Clone)]
+#[diagnostic_item("Clone")]
 pub trait Clone<Self>
 {
     proof ImpliedClause0: (Self: Sized)
@@ -22,7 +23,8 @@ pub trait Clone<Self>
 }
 
 // Full name: core::marker::Copy
-#[lang_item("copy")]
+#[lang_item(Copy)]
+#[diagnostic_item("Copy")]
 pub trait Copy<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -31,7 +33,7 @@ pub trait Copy<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -39,7 +41,7 @@ pub trait Destruct<Self>
 }
 
 // Full name: core::marker::Tuple
-#[lang_item("tuple_trait")]
+#[lang_item(Tuple)]
 pub trait Tuple<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -47,7 +49,7 @@ pub trait Tuple<Self>
 }
 
 // Full name: core::ops::function::FnOnce
-#[lang_item("fn_once")]
+#[lang_item(FnOnce)]
 pub trait FnOnce<Self, Args, Self_Output>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -59,7 +61,7 @@ pub trait FnOnce<Self, Args, Self_Output>
 }
 
 // Full name: core::ops::function::FnMut
-#[lang_item("fn_mut")]
+#[lang_item(FnMut)]
 pub trait FnMut<Self, Args, Self_Clause1_Output>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -71,7 +73,7 @@ pub trait FnMut<Self, Args, Self_Clause1_Output>
 }
 
 // Full name: core::ops::function::Fn
-#[lang_item("fn")]
+#[lang_item(Fn)]
 pub trait Fn<Self, Args, Self_Clause1_Clause1_Output>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -82,29 +84,36 @@ pub trait Fn<Self, Args, Self_Clause1_Clause1_Output>
     vtable: core::ops::function::Fn::{vtable}<Args, Self_Clause1_Clause1_Output>
 }
 
-struct test_crate::f::closure<'_0, T> {
-  &'_0 T,
+struct test_crate::f::closure<'_0, T>
+where
+    TypeOutlives0: T: '_0,
+{
+  _0: &'_0 T,
 }
 
 // Full name: test_crate::f
-fn f<'_0, T>(x_1: &'_0 T)
+fn f<'_0, T>(x: &'_0 T)
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     let _0: (); // return
-    let x_1: &'1 T; // arg #1
-    let _c_2: test_crate::f::closure<'3, T>; // local
+    let x: &'1 T; // arg #1
+    let _c: test_crate::f::closure<'3, T>; // local
     let _3: &'4 T; // anonymous local
 
+    storage_live(_0)
     _0 = ()
-    storage_live(_c_2)
+    storage_live(_c)
     storage_live(_3)
-    _3 = &(*x_1)
-    _c_2 = test_crate::f::closure { 0: move _3 }
+    _3 = &(*x)
+    _c = test_crate::f::closure { _0: move _3 }
     storage_dead(_3)
+    fake_read(_c)
     _0 = ()
-    storage_dead(_c_2)
+    storage_dead(_c)
+    storage_dead(x)
     return
 }
 
@@ -113,42 +122,64 @@ unsafe fn {impl Destruct for test_crate::f::closure<'_0, T>}::drop_glue<'_0, '_1
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: T: '_1,
+    RegionOutlives0: '_0: '_1,
 {
     let _0: (); // return
     let _1: &'1 mut test_crate::f::closure<'_0, T>; // arg #1
 
+    storage_live(_0)
     _0 = ()
+    storage_dead(_1)
     return
 }
 
 // Full name: test_crate::f::{impl Fn<(), T> for test_crate::f::closure<'_0, T>}::call
-fn {impl Fn<(), T> for test_crate::f::closure<'_0, T>}::call<'_0, '_1, T>(_1: &'_1 test_crate::f::closure<'_0, T>, tupled_args_2: ()) -> T
+fn {impl Fn<(), T> for test_crate::f::closure<'_0, T>}::call<'_0, '_1, T>(_1: &'_1 test_crate::f::closure<'_0, T>, tupled_args: ()) -> T
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: T: '_1,
+    RegionOutlives0: '_0: '_1,
 {
     let _0: T; // return
     let _1: &'1 test_crate::f::closure<'_0, T>; // arg #1
-    let tupled_args_2: (); // arg #2
+    let tupled_args: (); // arg #2
 
-    _0 = copy (*((*_1)).0)
+    storage_live(_0)
+    _0 = copy (*(*_1)._0)
+    storage_dead(tupled_args)
+    storage_dead(_1)
     return
 }
 
 // Full name: test_crate::f::{impl FnMut<(), T> for test_crate::f::closure<'_0, T>}::call_mut
-fn {impl FnMut<(), T> for test_crate::f::closure<'_0, T>}::call_mut<'_0, '_1, T>(state_1: &'_1 mut test_crate::f::closure<'_0, T>, args_2: ()) -> T
+fn {impl FnMut<(), T> for test_crate::f::closure<'_0, T>}::call_mut<'_0, '_1, T>(state: &'_1 mut test_crate::f::closure<'_0, T>, args: ()) -> T
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: T: '_1,
+    RegionOutlives0: '_0: '_1,
 {
     let _0: T; // return
-    let state_1: &'_1 mut test_crate::f::closure<'_0, T>; // arg #1
-    let args_2: (); // arg #2
+    let state: &'_1 mut test_crate::f::closure<'_0, T>; // arg #1
+    let args: (); // arg #2
     let _3: &'0 test_crate::f::closure<'_0, T>; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
-    _3 = &(*state_1)
-    _0 = {impl Fn<(), T> for test_crate::f::closure<'_0, T>}::call<'_0, '2, T>[TraitClause0, TraitClause1](move _3, move args_2)
+    _3 = &(*state)
+    _0 = {impl Fn<(), T> for test_crate::f::closure<'_0, T>}::call<'_0, '2, T>[TraitClause0, TraitClause1](move _3, move args)
+    ↳⚡ storage_dead(_3)
+        storage_dead(args)
+        storage_dead(state)
+        unwind_continue
+    storage_dead(_3)
+    storage_dead(args)
+    storage_dead(state)
     return
 }
 
@@ -157,16 +188,34 @@ fn {impl FnOnce<(), T> for test_crate::f::closure<'_0, T>}::call_once<'_0, T>(_1
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     let _0: T; // return
     let _1: test_crate::f::closure<'_0, T>; // arg #1
     let _2: (); // arg #2
     let _3: &'1 mut test_crate::f::closure<'_0, T>; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
     _3 = &mut _1
     _0 = {impl FnMut<(), T> for test_crate::f::closure<'_0, T>}::call_mut<'_0, '4, T>[TraitClause0, TraitClause1](move _3, move _2)
+    ↳⚡ drop[{impl Destruct for test_crate::f::closure<'_0, T>}::drop_glue<'_0, '7, T>[TraitClause0, TraitClause1]] _1
+        ↳⚡ storage_dead(_3)
+            storage_dead(_2)
+            storage_dead(_1)
+            unwind_terminate
+        storage_dead(_3)
+        storage_dead(_2)
+        storage_dead(_1)
+        unwind_continue
     drop[{impl Destruct for test_crate::f::closure<'_0, T>}::drop_glue<'_0, '10, T>[TraitClause0, TraitClause1]] _1
+    ↳⚡ storage_dead(_3)
+        storage_dead(_2)
+        storage_dead(_1)
+        unwind_continue
+    storage_dead(_3)
+    storage_dead(_2)
+    storage_dead(_1)
     return
 }
 
@@ -175,6 +224,7 @@ impl<'_0, T> FnOnce<(), T> for test_crate::f::closure<'_0, T>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     proof ImpliedClause0: (test_crate::f::closure<'_0, T>: MetaSized) = {built_in impl MetaSized for test_crate::f::closure<'_0, T>}
     proof ImpliedClause1: ((): Sized) = {built_in impl Sized for ()}
@@ -189,6 +239,7 @@ impl<'_0, T> FnMut<(), T> for test_crate::f::closure<'_0, T>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     proof ImpliedClause0: (test_crate::f::closure<'_0, T>: MetaSized) = {built_in impl MetaSized for test_crate::f::closure<'_0, T>}
     proof ImpliedClause1: (test_crate::f::closure<'_0, T>: FnOnce<(), T>) = {impl FnOnce<(), T> for test_crate::f::closure<'_0, T>}<'_0, T>[TraitClause0, TraitClause1]
@@ -203,6 +254,7 @@ impl<'_0, T> Fn<(), T> for test_crate::f::closure<'_0, T>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     proof ImpliedClause0: (test_crate::f::closure<'_0, T>: MetaSized) = {built_in impl MetaSized for test_crate::f::closure<'_0, T>}
     proof ImpliedClause1: (test_crate::f::closure<'_0, T>: FnMut<(), T>) = {impl FnMut<(), T> for test_crate::f::closure<'_0, T>}<'_0, T>[TraitClause0, TraitClause1]
@@ -217,34 +269,41 @@ impl<'_0, T> Destruct for test_crate::f::closure<'_0, T>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     fn drop_glue<'_0_1> = {impl Destruct for test_crate::f::closure<'_0, T>}::drop_glue<'_0, '_0_1, T>[TraitClause0, TraitClause1]
     non-dyn-compatible
 }
 
-struct test_crate::g::closure<'_0, T> {
-  &'_0 T,
+struct test_crate::g::closure<'_0, T>
+where
+    TypeOutlives0: T: '_0,
+{
+  _0: &'_0 T,
 }
 
 // Full name: test_crate::g
-fn g<T>(x_1: T)
+fn g<T>(x: T)
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
 {
     let _0: (); // return
-    let x_1: T; // arg #1
-    let _c_2: test_crate::g::closure<'1, T>; // local
+    let x: T; // arg #1
+    let _c: test_crate::g::closure<'1, T>; // local
     let _3: &'3 T; // anonymous local
 
+    storage_live(_0)
     _0 = ()
-    storage_live(_c_2)
+    storage_live(_c)
     storage_live(_3)
-    _3 = &x_1
-    _c_2 = test_crate::g::closure { 0: move _3 }
+    _3 = &x
+    _c = test_crate::g::closure { _0: move _3 }
     storage_dead(_3)
+    fake_read(_c)
     _0 = ()
-    storage_dead(_c_2)
+    storage_dead(_c)
+    storage_dead(x)
     return
 }
 
@@ -253,42 +312,64 @@ unsafe fn {impl Destruct for test_crate::g::closure<'_0, T>}::drop_glue<'_0, '_1
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: T: '_1,
+    RegionOutlives0: '_0: '_1,
 {
     let _0: (); // return
     let _1: &'1 mut test_crate::g::closure<'_0, T>; // arg #1
 
+    storage_live(_0)
     _0 = ()
+    storage_dead(_1)
     return
 }
 
 // Full name: test_crate::g::{impl Fn<(), T> for test_crate::g::closure<'_0, T>}::call
-fn {impl Fn<(), T> for test_crate::g::closure<'_0, T>}::call<'_0, '_1, T>(_1: &'_1 test_crate::g::closure<'_0, T>, tupled_args_2: ()) -> T
+fn {impl Fn<(), T> for test_crate::g::closure<'_0, T>}::call<'_0, '_1, T>(_1: &'_1 test_crate::g::closure<'_0, T>, tupled_args: ()) -> T
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: T: '_1,
+    RegionOutlives0: '_0: '_1,
 {
     let _0: T; // return
     let _1: &'1 test_crate::g::closure<'_0, T>; // arg #1
-    let tupled_args_2: (); // arg #2
+    let tupled_args: (); // arg #2
 
-    _0 = copy (*((*_1)).0)
+    storage_live(_0)
+    _0 = copy (*(*_1)._0)
+    storage_dead(tupled_args)
+    storage_dead(_1)
     return
 }
 
 // Full name: test_crate::g::{impl FnMut<(), T> for test_crate::g::closure<'_0, T>}::call_mut
-fn {impl FnMut<(), T> for test_crate::g::closure<'_0, T>}::call_mut<'_0, '_1, T>(state_1: &'_1 mut test_crate::g::closure<'_0, T>, args_2: ()) -> T
+fn {impl FnMut<(), T> for test_crate::g::closure<'_0, T>}::call_mut<'_0, '_1, T>(state: &'_1 mut test_crate::g::closure<'_0, T>, args: ()) -> T
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: T: '_1,
+    RegionOutlives0: '_0: '_1,
 {
     let _0: T; // return
-    let state_1: &'_1 mut test_crate::g::closure<'_0, T>; // arg #1
-    let args_2: (); // arg #2
+    let state: &'_1 mut test_crate::g::closure<'_0, T>; // arg #1
+    let args: (); // arg #2
     let _3: &'0 test_crate::g::closure<'_0, T>; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
-    _3 = &(*state_1)
-    _0 = {impl Fn<(), T> for test_crate::g::closure<'_0, T>}::call<'_0, '2, T>[TraitClause0, TraitClause1](move _3, move args_2)
+    _3 = &(*state)
+    _0 = {impl Fn<(), T> for test_crate::g::closure<'_0, T>}::call<'_0, '2, T>[TraitClause0, TraitClause1](move _3, move args)
+    ↳⚡ storage_dead(_3)
+        storage_dead(args)
+        storage_dead(state)
+        unwind_continue
+    storage_dead(_3)
+    storage_dead(args)
+    storage_dead(state)
     return
 }
 
@@ -297,16 +378,34 @@ fn {impl FnOnce<(), T> for test_crate::g::closure<'_0, T>}::call_once<'_0, T>(_1
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     let _0: T; // return
     let _1: test_crate::g::closure<'_0, T>; // arg #1
     let _2: (); // arg #2
     let _3: &'1 mut test_crate::g::closure<'_0, T>; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
     _3 = &mut _1
     _0 = {impl FnMut<(), T> for test_crate::g::closure<'_0, T>}::call_mut<'_0, '4, T>[TraitClause0, TraitClause1](move _3, move _2)
+    ↳⚡ drop[{impl Destruct for test_crate::g::closure<'_0, T>}::drop_glue<'_0, '7, T>[TraitClause0, TraitClause1]] _1
+        ↳⚡ storage_dead(_3)
+            storage_dead(_2)
+            storage_dead(_1)
+            unwind_terminate
+        storage_dead(_3)
+        storage_dead(_2)
+        storage_dead(_1)
+        unwind_continue
     drop[{impl Destruct for test_crate::g::closure<'_0, T>}::drop_glue<'_0, '10, T>[TraitClause0, TraitClause1]] _1
+    ↳⚡ storage_dead(_3)
+        storage_dead(_2)
+        storage_dead(_1)
+        unwind_continue
+    storage_dead(_3)
+    storage_dead(_2)
+    storage_dead(_1)
     return
 }
 
@@ -315,6 +414,7 @@ impl<'_0, T> FnOnce<(), T> for test_crate::g::closure<'_0, T>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     proof ImpliedClause0: (test_crate::g::closure<'_0, T>: MetaSized) = {built_in impl MetaSized for test_crate::g::closure<'_0, T>}
     proof ImpliedClause1: ((): Sized) = {built_in impl Sized for ()}
@@ -329,6 +429,7 @@ impl<'_0, T> FnMut<(), T> for test_crate::g::closure<'_0, T>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     proof ImpliedClause0: (test_crate::g::closure<'_0, T>: MetaSized) = {built_in impl MetaSized for test_crate::g::closure<'_0, T>}
     proof ImpliedClause1: (test_crate::g::closure<'_0, T>: FnOnce<(), T>) = {impl FnOnce<(), T> for test_crate::g::closure<'_0, T>}<'_0, T>[TraitClause0, TraitClause1]
@@ -343,6 +444,7 @@ impl<'_0, T> Fn<(), T> for test_crate::g::closure<'_0, T>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     proof ImpliedClause0: (test_crate::g::closure<'_0, T>: MetaSized) = {built_in impl MetaSized for test_crate::g::closure<'_0, T>}
     proof ImpliedClause1: (test_crate::g::closure<'_0, T>: FnMut<(), T>) = {impl FnMut<(), T> for test_crate::g::closure<'_0, T>}<'_0, T>[TraitClause0, TraitClause1]
@@ -357,6 +459,7 @@ impl<'_0, T> Destruct for test_crate::g::closure<'_0, T>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: Copy),
+    TypeOutlives0: T: '_0,
 {
     fn drop_glue<'_0_1> = {impl Destruct for test_crate::g::closure<'_0, T>}::drop_glue<'_0, '_0_1, T>[TraitClause0, TraitClause1]
     non-dyn-compatible

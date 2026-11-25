@@ -127,9 +127,11 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         self.binding_levels.push(BindingLevel::new());
 
         // Add the existentially quantified type.
-        let ty_id = self
-            .innermost_binder_mut()
-            .push_type_var(binder.existential_ty.index, binder.existential_ty.name);
+        let ty_id = self.innermost_binder_mut().push_type_var(
+            binder.existential_ty.index,
+            binder.existential_ty.name,
+            Variance::Unknown,
+        );
         let ty = TyKind::TypeVar(DeBruijnVar::new_at_zero(ty_id)).into_ty();
 
         self.register_predicates(&binder.predicates, PredicateOrigin::Dyn)?;
@@ -435,7 +437,8 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             fields.push(Field {
                 span,
                 attr_info: AttrInfo::dummy_public(),
-                name: Some(name),
+                name,
+                is_positional: false,
                 ty,
             });
         }
@@ -562,7 +565,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
                         .the_only_binder_mut()
                         .params
                         .types
-                        .push_with(|index| TypeParam { index, name });
+                        .push_with(|index| TypeParam::new(index, name, Variance::Invariant));
                     // Moving that type under two levels of binders: the `DynPredicate` binder and the
                     // type constraint binder.
                     let new_ty =
@@ -1024,6 +1027,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
                         let signature = FunSig {
                             is_unsafe: true,
                             abi: Abi::rust(),
+                            is_variadic: false,
                             inputs: vec![ref_dyn_self.clone()],
                             output: Ty::mk_unit(),
                         };
@@ -1097,6 +1101,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         let sig = FunSig {
             is_unsafe: false,
             abi: Abi::rust(),
+            is_variadic: false,
             inputs: vec![],
             output: Ty::new(TyKind::Adt(vtable_struct_ref.clone())),
         };

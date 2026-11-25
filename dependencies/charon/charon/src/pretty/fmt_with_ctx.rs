@@ -248,10 +248,34 @@ impl Display for BinOp {
 impl<C: AstFormatter> FmtWithCtx<C> for llbc::Block {
     fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for st in &self.statements {
-            writeln!(f, "{}", st.with_ctx(ctx))?;
+            write!(f, "{}", st.with_ctx(ctx))?;
+            if !st.kind.is_nop() {
+                writeln!(f)?;
+            }
         }
         Ok(())
     }
+}
+
+const LLBC_UNWIND_PREFIX: &str = "↳⚡ ";
+
+fn fmt_llbc_unwind_block<C: AstFormatter>(
+    ctx: &C,
+    f: &mut fmt::Formatter<'_>,
+    on_unwind: &llbc::Block,
+) -> fmt::Result {
+    let tab = ctx.indent();
+    let block = on_unwind.to_string_with_ctx(&ctx.reset_indent());
+    let mut lines = block.lines();
+    if let Some(first) = lines.next() {
+        write!(f, "\n{tab}{LLBC_UNWIND_PREFIX}{first}")?;
+        let ctx = ctx.increase_indent();
+        let tab = ctx.indent();
+        for line in lines {
+            write!(f, "\n{tab}{line}")?;
+        }
+    }
+    Ok(())
 }
 
 impl<C: AstFormatter> FmtWithCtx<C> for ullbc::BlockData {
@@ -518,10 +542,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for DynPredicate {
 impl_display_via_ctx!(Field);
 impl<C: AstFormatter> FmtWithCtx<C> for Field {
     fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(name) = &self.name {
-            write!(f, "{}: ", name)?
-        }
-        write!(f, "{}", self.ty.with_ctx(ctx))
+        write!(f, "{}: {}", self.name, self.ty.with_ctx(ctx))
     }
 }
 
@@ -601,11 +622,12 @@ impl<C: AstFormatter> FmtWithCtx<C> for FunDecl {
         // Arguments
         let n_args = self.signature.inputs.len();
         let args_of_locals = |l: &Locals| {
+            let ctx = ctx.set_locals(l);
             l.locals
                 .iter()
                 .skip(1)
                 .take(n_args)
-                .map(|l| format!("{l}"))
+                .map(|l| format!("{}", l.index.with_ctx(&ctx)))
                 .collect::<Vec<String>>()
         };
 
@@ -636,7 +658,15 @@ impl<C: AstFormatter> FmtWithCtx<C> for FunDecl {
             args.push(format!("{}: {}", name, ty.with_ctx(ctx)));
         }
         let args = args.join(", ");
-        write!(f, "({args})")?;
+        if self.signature.is_variadic {
+            if args.is_empty() {
+                write!(f, "(...)")?;
+            } else {
+                write!(f, "({args}, ...)")?;
+            }
+        } else {
+            write!(f, "({args})")?;
+        }
 
         // Return type
         if !self.signature.output.is_unit() {
@@ -670,6 +700,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for RegionBinder<FunSig> {
         let FunSig {
             is_unsafe,
             abi,
+            is_variadic,
             inputs,
             output,
         } = &self.skip_binder;
@@ -690,8 +721,17 @@ impl<C: AstFormatter> FmtWithCtx<C> for RegionBinder<FunSig> {
                 self.regions.iter().map(|r| r.with_ctx(ctx)).format(", ")
             )?;
         }
+        let is_empty = inputs.is_empty();
         let inputs = inputs.iter().map(|x| x.with_ctx(ctx)).format(", ");
-        write!(f, "({inputs})")?;
+        if *is_variadic {
+            if is_empty {
+                write!(f, "(...)")?;
+            } else {
+                write!(f, "({inputs}, ...)")?;
+            }
+        } else {
+            write!(f, "({inputs})")?;
+        }
         if !output.is_unit() {
             let output = output.with_ctx(ctx);
             write!(f, " -> {output}")?;
@@ -878,7 +918,7 @@ impl<T> GExprBody<T> {
         // Format the local variables
         for v in &self.locals.locals {
             write!(f, "{tab}")?;
-            write!(f, "let {v}: {};", v.ty.with_ctx(ctx))?;
+            write!(f, "let {}: {};", v.index.with_ctx(ctx), v.ty.with_ctx(ctx))?;
 
             write!(f, " // ")?;
             if v.index.is_zero() {
@@ -921,7 +961,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for GExprBody<ullbc_ast::BodyContents> {
         fn fmt_body<C: AstFormatter>(
             f: &mut fmt::Formatter<'_>,
             ctx: &<<C as AstFormatter>::Reborrow<'_> as AstFormatter>::Reborrow<'_>,
-            body: &IndexVec<BlockId, BlockData>,
+            body: &IndexVec<ullbc::BlockId, BlockData>,
         ) -> Result<(), fmt::Error> {
             let tab = ctx.indent();
             let ctx = &ctx.increase_indent();
@@ -1103,7 +1143,10 @@ impl ItemMeta {
         }
 
         if let Some(id) = &self.lang_item {
-            writeln!(f, "{tab}#[lang_item(\"{id}\")]")?;
+            writeln!(f, "{tab}#[lang_item({id:?})]")?;
+        }
+        if let Some(id) = &self.diagnostic_item {
+            writeln!(f, "{tab}#[diagnostic_item(\"{id}\")]")?;
         }
         write!(f, "{tab}")?;
         if self.attr_info.public {
@@ -1119,7 +1162,7 @@ impl Display for Literal {
             Literal::Scalar(v) => write!(f, "{v}"),
             Literal::Float(v) => write!(f, "{v}"),
             Literal::Bool(v) => write!(f, "{v}"),
-            Literal::Char(v) => write!(f, "{v}"),
+            Literal::Char(v) => write!(f, "'{}'", v.escape_debug()),
             Literal::Str(v) => write!(f, "\"{}\"", v.replace("\\", "\\\\").replace("\n", "\\n")),
             Literal::ByteStr(v) => write!(f, "{v:?}"),
         }
@@ -1300,12 +1343,14 @@ impl<C: AstFormatter> FmtWithCtx<C> for Place {
                     }
                     ProjectionElem::Field(proj_kind, field_id) => match proj_kind {
                         FieldProjKind::Adt(adt_id, opt_variant_id) => {
-                            write!(f, "({sub}")?;
-                            if let Some(variant_id) = opt_variant_id {
-                                write!(f, " as variant ")?;
-                                ctx.format_enum_variant(f, *adt_id, *variant_id)?;
+                            match opt_variant_id {
+                                None => write!(f, "{sub}.")?,
+                                Some(variant_id) => {
+                                    write!(f, "({sub} as variant ")?;
+                                    ctx.format_enum_variant(f, *adt_id, *variant_id)?;
+                                    write!(f, ").")?;
+                                }
                             }
-                            write!(f, ").")?;
                             ctx.format_field_name(f, *adt_id, *opt_variant_id, *field_id)?;
                             Ok(())
                         }
@@ -1745,6 +1790,44 @@ impl Display for ScalarValue {
     }
 }
 
+impl<C: AstFormatter> FmtWithCtx<C> for BorrowckStatement {
+    fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BorrowckStatement::FakeRead(place) => {
+                write!(f, "fake_read({})", place.with_ctx(ctx))
+            }
+            BorrowckStatement::SetType {
+                place,
+                ty,
+                variance,
+            } => {
+                let relation = match variance {
+                    Variance::Covariant => "<=",
+                    Variance::Contravariant => ">=",
+                    Variance::Invariant => "==",
+                    Variance::Bivariant => panic!("bivariant SetType statement"),
+                    Variance::Unknown => panic!("SetType statement with unknown variance"),
+                };
+                write!(
+                    f,
+                    "set_type(typeof({}) {relation} {})",
+                    place.with_ctx(ctx),
+                    ty.with_ctx(ctx)
+                )
+            }
+            BorrowckStatement::SetOutlives(ty, region) => write!(
+                f,
+                "set_outlives({}, {})",
+                ty.with_ctx(ctx),
+                region.with_ctx(ctx)
+            ),
+            BorrowckStatement::PredicateHolds(predicate) => {
+                write!(f, "predicate_holds({})", predicate.with_ctx(ctx))
+            }
+        }
+    }
+}
+
 impl<C: AstFormatter> FmtWithCtx<C> for ullbc::Statement {
     fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let tab = ctx.indent();
@@ -1756,22 +1839,15 @@ impl<C: AstFormatter> FmtWithCtx<C> for ullbc::Statement {
             StatementKind::Assign(place, rvalue) => {
                 write!(f, "{tab}{} = {}", place.with_ctx(ctx), rvalue.with_ctx(ctx),)
             }
+            StatementKind::Borrowck(statement) => {
+                write!(f, "{tab}{}", statement.with_ctx(ctx))
+            }
             StatementKind::SetDiscriminant(place, variant_id) => write!(
                 f,
                 "{tab}@discriminant({}) = {}",
                 place.with_ctx(ctx),
                 variant_id
             ),
-            StatementKind::CopyNonOverlapping(cno) => {
-                write!(
-                    f,
-                    "{}copy_nonoverlapping({}, {}, {})",
-                    tab,
-                    cno.src.with_ctx(ctx),
-                    cno.dst.with_ctx(ctx),
-                    cno.count.with_ctx(ctx),
-                )
-            }
             StatementKind::StorageLive(var_id) => {
                 write!(f, "{tab}storage_live({})", var_id.with_ctx(ctx))
             }
@@ -1801,22 +1877,17 @@ impl<C: AstFormatter> FmtWithCtx<C> for llbc::Statement {
         for line in &self.comments_before {
             writeln!(f, "{tab}// {line}")?;
         }
+        if self.kind.is_nop() {
+            return Ok(());
+        }
         write!(f, "{tab}")?;
         match &self.kind {
             StatementKind::Assign(place, rvalue) => {
                 write!(f, "{} = {}", place.with_ctx(ctx), rvalue.with_ctx(ctx),)
             }
+            StatementKind::Borrowck(statement) => write!(f, "{}", statement.with_ctx(ctx)),
             StatementKind::SetDiscriminant(place, variant_id) => {
                 write!(f, "@discriminant({}) = {}", place.with_ctx(ctx), variant_id)
-            }
-            StatementKind::CopyNonOverlapping(cno) => {
-                write!(
-                    f,
-                    "copy_nonoverlapping({}, {}, {})",
-                    cno.src.with_ctx(ctx),
-                    cno.dst.with_ctx(ctx),
-                    cno.count.with_ctx(ctx),
-                )
             }
             StatementKind::StorageLive(var_id) => {
                 write!(f, "storage_live({})", var_id.with_ctx(ctx))
@@ -1827,55 +1898,71 @@ impl<C: AstFormatter> FmtWithCtx<C> for llbc::Statement {
             StatementKind::PlaceMention(place) => {
                 write!(f, "_ = {}", place.with_ctx(ctx))
             }
-            StatementKind::Drop(place, tref, kind) => {
+            StatementKind::Drop {
+                place,
+                fn_ptr,
+                kind,
+                on_unwind,
+            } => {
                 let kind = match kind {
                     DropKind::Precise => "drop",
                     DropKind::Conditional => "conditional_drop",
                 };
-                write!(f, "{kind}[{}] {}", tref.with_ctx(ctx), place.with_ctx(ctx),)
+                write!(
+                    f,
+                    "{kind}[{}] {}",
+                    fn_ptr.with_ctx(ctx),
+                    place.with_ctx(ctx),
+                )?;
+                fmt_llbc_unwind_block(ctx, f, on_unwind)
             }
-            StatementKind::Assert { assert, on_failure } => {
+            StatementKind::Assert {
+                assert,
+                on_failure,
+                on_unwind,
+            } => {
                 write!(
                     f,
                     "{} else {}",
                     assert.with_ctx(ctx),
                     on_failure.with_ctx(ctx)
-                )
+                )?;
+                fmt_llbc_unwind_block(ctx, f, on_unwind)
             }
-            StatementKind::InlineAsm { asm, targets } => {
+            StatementKind::InlineAsm {
+                asm,
+                targets,
+                on_unwind,
+            } => {
                 write!(f, "asm!({asm:?})")?;
-                if let [target] = targets.as_slice() {
-                    for statement in &target.statements {
-                        write!(f, "\n{}", statement.with_ctx(ctx))?;
-                    }
-                    return Ok(());
-                }
                 if !targets.is_empty() {
                     write!(f, " {{")?;
                     let ctx1 = &ctx.increase_indent();
-                    let tab1 = ctx1.indent();
-                    let ctx2 = &ctx1.increase_indent();
                     for (i, target) in targets.iter().enumerate() {
+                        let tab = ctx1.indent();
+                        let ctx = &ctx1.increase_indent();
                         write!(
                             f,
-                            "\n{tab1}target {i} => {{\n{}{tab1}}}",
-                            target.with_ctx(ctx2)
+                            "\n{tab}target {i} => {{\n{}{tab}}}",
+                            target.with_ctx(ctx)
                         )?;
                     }
                     write!(f, "\n{tab}}}")?;
                 }
+                fmt_llbc_unwind_block(ctx, f, on_unwind)?;
                 Ok(())
             }
-            StatementKind::Call(call) => {
-                write!(f, "{}", call.with_ctx(ctx))
+            StatementKind::Call { call, on_unwind } => {
+                write!(f, "{}", call.with_ctx(ctx))?;
+                fmt_llbc_unwind_block(ctx, f, on_unwind)
             }
             StatementKind::Abort(kind) => {
                 write!(f, "{}", kind.with_ctx(ctx))
             }
             StatementKind::Return => write!(f, "return"),
+            StatementKind::UnwindResume => write!(f, "unwind_continue"),
             StatementKind::Break(index) => write!(f, "break {index}"),
             StatementKind::Continue(index) => write!(f, "continue {index}"),
-            StatementKind::Nop => write!(f, "nop"),
             StatementKind::Switch(switch) => match switch {
                 Switch::If(discr, true_st, false_st) => {
                     let ctx = &ctx.increase_indent();
@@ -1947,6 +2034,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for llbc::Statement {
                 write!(f, "loop {{\n{}{tab}}}", body.with_ctx(ctx))
             }
             StatementKind::Error(s) => write!(f, "@ERROR({})", s),
+            StatementKind::Nop => unreachable!(),
         }
     }
 }
@@ -2528,7 +2616,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for Variant {
         write!(f, "{}", self.name)?;
         if !self.fields.is_empty() {
             let fields = self.fields.iter().map(|f| f.with_ctx(ctx)).format(", ");
-            write!(f, "({})", fields)?;
+            write!(f, " {{ {} }}", fields)?;
         }
         Ok(())
     }

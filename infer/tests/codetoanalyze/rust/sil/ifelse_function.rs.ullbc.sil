@@ -37,17 +37,15 @@ define ifelse_function::ifelse(b_1: int, x_2: int, y_3: int) : int {
       prune n1
       n2:int = load &x_2
       store &var_0 <- n2:int
-      jmp node_3
+      n3:int = load &var_0
+      ret n3
       
   #node_2:
       prune __sil_lnot(n1)
-      n3:int = load &y_3
-      store &var_0 <- n3:int
-      jmp node_3
-      
-  #node_3:
-      n4:int = load &var_0
-      ret n4
+      n4:int = load &y_3
+      store &var_0 <- n4:int
+      n5:int = load &var_0
+      ret n5
       
 }
 

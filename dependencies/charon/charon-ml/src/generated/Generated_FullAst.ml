@@ -1,11 +1,11 @@
 (** WARNING: this file is partially auto-generated. Do not edit `FullAst.ml` by
-    hand. Edit `templates/FullAst.ml` instead, or improve the code generation
-    tool so avoid the need for hand-writing things.
+    hand. Edit `generate_ml/templates/FullAst.ml` instead, or improve the code
+    generation tool so avoid the need for hand-writing things.
 
-    `templates/FullAst.ml` contains the manual definitions and some `(*
-    __REPLACEn__ *)` comments. These comments are replaced by auto-generated
-    definitions by running `make generate-ml` in the crate root. The
-    code-generation code is in `charon/src/bin/generate-ml`. *)
+    `generate_ml/templates/FullAst.ml` contains the manual definitions and some
+    `(* __REPLACEn__ *)` comments. These comments are replaced by auto-generated
+    definitions by running `make generate-asts` in the crate root. The
+    code-generation code is in `charon/src/bin/generate-asts`. *)
 
 open Generated_GAst
 open Generated_UllbcAst
@@ -67,11 +67,9 @@ and cli_options = {
           Without this option, drops may be "conditional" and we may lack
           information about what code is run on drop in a given polymorphic
           function body. *)
-  skip_borrowck : bool;
-      (** If activated, this skips borrow-checking of the crate. *)
   mir : mir_level option;
       (** The MIR stage to extract. This is only relevant for the current crate;
-          for dpendencies only MIR optimized is available. *)
+          for dependencies only MIR optimized is available. *)
   rustc_args : string list;  (** Extra flags to pass to rustc. *)
   targets : string list;
       (** A list of target architectures to translate for. Charon will run the
@@ -137,20 +135,24 @@ and cli_options = {
       (** Whether to hide various marker traits such as [Sized], [Sync], and
           [Send] anywhere they show up. This can considerably speed up
           translation. *)
-  remove_adt_clauses : bool;
-      (** Remove trait clauses from type declarations. Must be combined with
-          [--lift-associated-types] for type declarations that use trait
-          associated types in their fields, otherwise this will result in
-          errors. *)
   hide_allocator : bool;
       (** Hide the [A] type parameter on standard library containers ([Box],
           [Vec], etc). *)
+  remove_unused_clauses : bool;
+      (** Remove trait clauses that aren't ultimately used anywhere. This is
+          potentially incorrect as sometimes the mere presence of a trait clause
+          is used to justify an operation, e.g. copying [Copy] data using
+          [unsafe]. *)
   remove_unused_self_clauses : bool;
-      (** Trait method declarations take a [Self: Trait] clause as parameter, so
-          that they can be reused by multiple trait impls. This however causes
-          trait definitions to be mutually recursive with their method
-          declarations. This flag removes [Self] clauses that aren't used to
-          break this mutual recursion when possible. *)
+      (** Trait method default bodies take a [Self: Trait] clause as parameter,
+          so that they can be reused by multiple trait impls. This however
+          causes trait definitions to be mutually recursive with their default
+          methods. This flag removes [Self] clauses that aren't used to break
+          this mutual recursion when possible. *)
+  remove_adt_clauses : bool;
+      (** Remove trait clauses from type declarations. Best combined with
+          [--lift-associated-types] for type declarations that use trait
+          associated types in their fields. *)
   desugar_drops : bool;
       (** Transform precise drops to the equivalent [drop_glue(&mut p)] call. *)
   ops_to_function_calls : bool;
@@ -163,6 +165,12 @@ and cli_options = {
   treat_box_as_builtin : bool;
       (** Treat [Box<T>] as if it was a built-in type. *)
   raw_consts : bool;  (** Do not inline or evaluate constants. *)
+  consts : const_handling option;
+      (** How to handle constants and statics: whether they should be
+          represented as a call to their initializer function, or whether we
+          should attempt to evaluate them into a value. When evaluation isn't
+          possible (e.g. the constant is generic, or for recursive statics), we
+          fall back to the initializer call. *)
   unsized_strings : bool;
       (** Replace string literal constants with a constant u8 array that gets
           unsized, expliciting the fact a string constant has a hidden
@@ -204,13 +212,27 @@ and cli_options = {
   format : serialization_format_arg option;
       (** Serialization format for emitted (U)LLBC files. Defaults to json. *)
   no_serialize : bool;  (** Don't serialize the final (U)LLBC to a file. *)
+  skip_borrowck : bool;
+      (** If activated, this skips borrow-checking of the crate. *)
   no_typecheck : bool;  (** Skip the typecheck passes. *)
   no_normalize : bool;  (** Don't normalize associated types. *)
+  no_reorder_decls : bool;
+      (** Don't compute a stable order for declarations. *)
   abort_on_error : bool;
       (** Panic on the first error. This is useful for debugging. *)
   error_on_warnings : bool;  (** Consider any warnings to be errors. *)
   preset : preset option;  (** Named builtin sets of options. *)
 }
+
+(** How to handle constants and statics. *)
+and const_handling =
+  | Initializers
+      (** Keep consts as calls to their initializer with
+          [ConstantExprKind::Call], without attempting to do any
+          const-evaluation. This is the default. *)
+  | Values
+      (** Try evaluating consts and statics to their final value. If evaluation
+          fails, we fall back to the initializer call. *)
 
 (** A (group of) top-level declaration(s), properly reordered. *)
 and declaration_group =
@@ -289,23 +311,40 @@ and target_info = {
   target_pointer_size : int;  (** The pointer size of the target in bytes. *)
   is_little_endian : bool;
       (** Whether the target platform uses little endian byte order. *)
+  c_enum_min_size : int;  (** The minimum size of a [[repr(C)]] enum. *)
+  primitive_alignments : (literal_type * int) list;
+      (** Alignments for primitive types. *)
 }
 
-(** The data of a translated crate. *)
+(** The complete data of a Rust crate.
+
+    A crate is mainly composed of 5 kinds of items:
+    - Functions;
+    - Type definitions;
+    - Globals (constants and statics);
+    - Trait declarations;
+    - Trait implementations.
+
+    These can each be found in the corresponding [IndexVec]. They are in an
+    unspecified (though deterministic) order. If you need a more robust order,
+    see [ordered_decls].
+
+    To get a [TranslatedCrate], run [charon cargo] inside a Rust crate, then
+    deserialize the resulting [crate_name.llbc] file using
+    [[crate::deserialize_llbc]]. *)
 and translated_crate = {
   crate_name : string;  (** The name of the crate. *)
   options : cli_options;
-      (** The options used when calling Charon. It is useful for the
-          applications which consumed the serialized code, to check that Charon
-          was called with the proper options. *)
+      (** The options used when calling Charon. Can be used to check that Charon
+          was called with the options that a given consumer requires. *)
   target_information : (string * target_info) list;
-      (** Information about each target platform. When translating a crate
-          normally this will have a single entry; when using [--targets] this
-          will have one entry per chosen target. *)
+      (** Information about each target platform for which the crate was
+          translated. When translating a crate normally this will have a single
+          entry; when using [--targets] this will have one entry per chosen
+          target. *)
   files : file list;
-      (** The translated files. This field must come before any field containing
-          spans, as the OCaml deserialization of spans requires the files to be
-          deserialized already. *)
+      (** The source files composing the crate and its dependencies. Each
+          [[Span]] refers to a byte range within one of these files. *)
   item_names : (item_id * name) list;
       (** The names of all registered items. Available so we can know the names
           even of items that failed to translate. Invariant: after translation,
@@ -319,16 +358,30 @@ and translated_crate = {
   short_names : (item_id * name) list;
       (** Short names, for items whose last PathElem is unique. *)
   type_decls : type_decl type_decl_id_map;
-      (** The translated type definitions *)
+      (** The type definitions (structs, enums, ...). *)
   fun_decls : fun_decl fun_decl_id_map;
-      (** The translated function definitions *)
+      (** The function definitions.
+
+          Each item with a body becomes a function: actual functions, methods,
+          and unevaluated consts/statics. *)
   global_decls : global_decl global_decl_id_map;
-      (** The translated global definitions *)
-  trait_decls : trait_decl trait_decl_id_map;
-      (** The translated trait declarations *)
-  trait_impls : trait_impl trait_impl_id_map;
-      (** The translated trait declarations *)
+      (** The global definitions, which are constants, statics, and thread
+          locals. *)
+  trait_decls : trait_decl trait_decl_id_map;  (** The trait declarations. *)
+  trait_impls : trait_impl trait_impl_id_map;  (** The trait implementations. *)
   ordered_decls : declaration_group list option;
-      (** The re-ordered groups of declarations, initialized as empty. *)
+      (** This contains a list of all the reachable items in the crate in a
+          stable, logical order based on crate and file order, then further
+          grouped and sorted such that every item comes after the items it
+          depends on. Mutually-dependent groups of items are identified as such.
+          This is meant for code-generation tools that want a stable output
+          order.
+
+          Not all the items in the [TranslatedCrate] are included: some trait
+          impls are never referred to by reachable items so could in principle
+          be removed from the crate, but we keep them around to be able to tell
+          method implementations apart.
+
+          [Some] after translation unless [--no-reorder-decls] is passed. *)
 }
 [@@deriving show]

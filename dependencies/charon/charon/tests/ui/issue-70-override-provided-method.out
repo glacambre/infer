@@ -1,7 +1,8 @@
 # Final LLBC before serialization:
 
 // Full name: core::cmp::PartialEq
-#[lang_item("eq")]
+#[lang_item(PartialEq)]
+#[diagnostic_item("PartialEq")]
 pub trait PartialEq<Self, Rhs>
 {
     fn eq<'_0_1, '_1_1>;
@@ -9,7 +10,7 @@ pub trait PartialEq<Self, Rhs>
 }
 
 // Full name: core::cmp::Ordering
-#[lang_item("Ordering")]
+#[lang_item(OrderingEnum)]
 pub enum Ordering {
   Less,
   Equal,
@@ -17,11 +18,11 @@ pub enum Ordering {
 }
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -29,17 +30,19 @@ pub trait Sized<Self>
 }
 
 // Full name: core::option::Option
-#[lang_item("Option")]
+#[lang_item(Option)]
+#[diagnostic_item("Option")]
 pub enum Option<T>
 where
     TraitClause0: (T: Sized),
 {
   None,
-  Some(T),
+  Some { _0: T },
 }
 
 // Full name: core::cmp::PartialOrd
-#[lang_item("partial_ord")]
+#[lang_item(PartialOrd)]
+#[diagnostic_item("PartialOrd")]
 pub trait PartialOrd<Self, Rhs>
 {
     proof ImpliedClause0: (Self: PartialEq<Rhs>)
@@ -62,7 +65,7 @@ pub fn impl_PartialOrd_u32_for_u32::partial_cmp<'_0, '_1>(_1: &'_0 u32, _2: &'_1
 = <opaque>
 
 // Full name: core::marker::StructuralPartialEq
-#[lang_item("structural_peq")]
+#[lang_item(StructuralPeq)]
 pub trait StructuralPartialEq<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -74,6 +77,8 @@ pub fn impl_PartialEq_Option_for_Option::eq<'_0, '_1, T>(_1: &'_0 Option<T>[Trai
 where
     TraitClause0: (T: Sized),
     TraitClause1: (T: PartialEq<T>),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: T: '_1,
 = <opaque>
 
 // Full name: test_crate::main
@@ -95,15 +100,16 @@ fn main()
     storage_live(_7)
     storage_live(_10)
     storage_live(_11)
-    _11 = Option::Some { 0: const 1i32 }
+    _11 = Option::Some { _0: const 1i32 }
     _10 = &_11
     _7 = move _10
     storage_live(_6)
     storage_live(_8)
     storage_live(_9)
-    _9 = Option::Some { 0: const 1i32 }
+    _9 = Option::Some { _0: const 1i32 }
     _8 = &_9
     _6 = move _8
+    storage_live(_0)
     storage_live(_4)
     storage_live(_5)
     _0 = ()
@@ -115,16 +121,27 @@ fn main()
     _4 = move _7
     _3 = &(*_4)
     _1 = impl_PartialEq_Option_for_Option::eq<'9, '10, i32>[{built_in impl Sized for i32}, impl_PartialEq_i32_for_i32](move _2, move _3)
+    ↳⚡ storage_dead(_5)
+        storage_dead(_4)
+        unwind_continue
     storage_dead(_3)
     storage_dead(_2)
     storage_dead(_1)
     _0 = ()
+    storage_dead(_5)
+    storage_dead(_4)
+    storage_dead(_11)
+    storage_dead(_10)
+    storage_dead(_9)
+    storage_dead(_8)
+    storage_dead(_7)
+    storage_dead(_6)
     return
 }
 
 // Full name: test_crate::Foo
 struct Foo {
-  u32,
+  _0: u32,
 }
 
 // Full name: test_crate::{impl StructuralPartialEq for Foo}
@@ -134,21 +151,24 @@ impl "impl_StructuralPartialEq_for_Foo" StructuralPartialEq for Foo {
 }
 
 // Full name: test_crate::{impl PartialEq<Foo> for Foo}::eq
-pub fn impl_PartialEq_Foo_for_Foo::eq<'_0, '_1>(self_1: &'_0 Foo, other_2: &'_1 Foo) -> bool
+pub fn impl_PartialEq_Foo_for_Foo::eq<'_0, '_1>(self: &'_0 Foo, other: &'_1 Foo) -> bool
 {
     let _0: bool; // return
-    let self_1: &'1 Foo; // arg #1
-    let other_2: &'2 Foo; // arg #2
+    let self: &'1 Foo; // arg #1
+    let other: &'2 Foo; // arg #2
     let _3: u32; // anonymous local
     let _4: u32; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
-    _3 = copy ((*self_1)).0
+    _3 = copy (*self)._0
     storage_live(_4)
-    _4 = copy ((*other_2)).0
+    _4 = copy (*other)._0
     _0 = move _3 == move _4
     storage_dead(_4)
     storage_dead(_3)
+    storage_dead(other)
+    storage_dead(self)
     return
 }
 
@@ -159,29 +179,35 @@ impl "impl_PartialEq_Foo_for_Foo" PartialEq<Foo> for Foo {
 }
 
 // Full name: test_crate::{impl PartialOrd<Foo> for Foo}::partial_cmp
-pub fn impl_PartialOrd_Foo_for_Foo::partial_cmp<'_0, '_1>(self_1: &'_0 Foo, other_2: &'_1 Foo) -> Option<Ordering>[{built_in impl Sized for Ordering}]
+pub fn impl_PartialOrd_Foo_for_Foo::partial_cmp<'_0, '_1>(self: &'_0 Foo, other: &'_1 Foo) -> Option<Ordering>[{built_in impl Sized for Ordering}]
 {
     let _0: Option<Ordering>[{built_in impl Sized for Ordering}]; // return
-    let self_1: &'1 Foo; // arg #1
-    let other_2: &'2 Foo; // arg #2
+    let self: &'1 Foo; // arg #1
+    let other: &'2 Foo; // arg #2
     let _3: &'4 u32; // anonymous local
     let _4: &'5 u32; // anonymous local
     let _5: &'6 u32; // anonymous local
     let _6: &'7 u32; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
     storage_live(_4)
-    _4 = &((*self_1)).0
+    _4 = &(*self)._0
     _3 = &(*_4)
     storage_live(_5)
     storage_live(_6)
-    _6 = &((*other_2)).0
+    _6 = &(*other)._0
     _5 = &(*_6)
     _0 = impl_PartialOrd_u32_for_u32::partial_cmp<'10, '11>(move _3, move _5)
+    ↳⚡ storage_dead(other)
+        storage_dead(self)
+        unwind_continue
     storage_dead(_6)
     storage_dead(_5)
     storage_dead(_4)
     storage_dead(_3)
+    storage_dead(other)
+    storage_dead(self)
     return
 }
 

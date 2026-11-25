@@ -1,7 +1,7 @@
 # Final LLBC before serialization:
 
 // Full name: core::cmp::Ordering
-#[lang_item("Ordering")]
+#[lang_item(OrderingEnum)]
 pub enum Ordering {
   Less,
   Equal,
@@ -9,11 +9,11 @@ pub enum Ordering {
 }
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -37,6 +37,7 @@ where
     let _0: (); // return
     let _1: for<'_0_1, '_1_1> TraitClause1::cmp<'_0_1, '_1_1>; // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_1)
     _1 = const TraitClause1::cmp<'0, '1>

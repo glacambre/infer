@@ -136,7 +136,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         let mut params = GenericParams::empty();
         params
             .regions
-            .push_with(|index| RegionParam::new(index, None));
+            .push_with(|index| RegionParam::new(index, None, Variance::Covariant));
         params
     }
 
@@ -146,6 +146,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         FunSig {
             is_unsafe: true,
             abi: Abi::rust(),
+            is_variadic: false,
             inputs: [self_ref].into(),
             output: Ty::mk_unit(),
         }

@@ -1,7 +1,7 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: test_crate::module2::do_translate
@@ -9,6 +9,7 @@ fn do_translate()
 {
     let _0: (); // return
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
     return
@@ -19,6 +20,7 @@ fn also_translate()
 {
     let _0: (); // return
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
     return
@@ -32,6 +34,7 @@ fn method()
 {
     let _0: (); // return
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
     return

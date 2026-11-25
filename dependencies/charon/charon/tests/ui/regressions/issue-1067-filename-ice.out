@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,15 +13,24 @@ pub trait Sized<Self>
 }
 
 // Full name: core::result::Result
-#[lang_item("Result")]
+#[diagnostic_item("Result")]
 pub enum Result<T, E>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (E: Sized),
 {
-  Ok(T),
-  Err(E),
+  Ok { _0: T },
+  Err { _0: E },
 }
+
+// Full name: core::result::Result::{impl Destruct for Result<T, E>[TraitClause0, TraitClause1]}::drop_glue
+unsafe fn impl_Destruct_for_Result::drop_glue<'_0, T, E>(_1: &'_0 mut Result<T, E>[TraitClause0, TraitClause1])
+where
+    TraitClause0: (T: Sized),
+    TraitClause1: (E: Sized),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: E: '_0,
+= <opaque>
 
 // Full name: core::result::{Result<T, E>[TraitClause0, TraitClause1]}::unwrap
 pub fn unwrap<T, E>(_1: Result<T, E>[TraitClause0, TraitClause1]) -> T
@@ -40,7 +49,7 @@ impl "impl_Debug_for_Error" Debug for Error {
 }
 
 // Full name: alloc::vec::Vec
-#[lang_item("Vec")]
+#[diagnostic_item("Vec")]
 pub opaque type Vec<T>
 where
     TraitClause0: (T: Sized),
@@ -50,10 +59,11 @@ where
 pub fn impl_Write_for_Vec_u8::write_all<'_0, '_1, A>(_1: &'_0 mut Vec<u8>[{built_in impl Sized for u8}, TraitClause0], _2: &'_1 [u8]) -> Result<(), Error>[{built_in impl Sized for ()}, {built_in impl Sized for Error}]
 where
     TraitClause0: (A: Sized),
+    TypeOutlives0: A: '_0,
 = <opaque>
 
 // Full name: alloc::alloc::Global
-#[lang_item("global_alloc_ty")]
+#[lang_item(GlobalAlloc)]
 pub struct Global {}
 
 // Full name: alloc::vec::Vec::{impl Destruct for Vec<T>[TraitClause0, TraitClause1]}::drop_glue
@@ -61,10 +71,12 @@ unsafe fn impl_Destruct_for_Vec::drop_glue<'_0, T, A>(_1: &'_0 mut Vec<T>[TraitC
 where
     TraitClause0: (T: Sized),
     TraitClause1: (A: Sized),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: A: '_0,
 = <opaque>
 
 // Full name: alloc::vec::{Vec<T>[TraitClause0, {built_in impl Sized for Global}]}::new
-#[lang_item("vec_new")]
+#[diagnostic_item("vec_new")]
 pub fn new<T>() -> Vec<T>[TraitClause0, {built_in impl Sized for Global}]
 where
     TraitClause0: (T: Sized),
@@ -74,7 +86,7 @@ where
 fn main()
 {
     let _0: (); // return
-    let buf_1: Vec<u8>[{built_in impl Sized for u8}, {built_in impl Sized for Global}]; // local
+    let buf: Vec<u8>[{built_in impl Sized for u8}, {built_in impl Sized for Global}]; // local
     let _2: (); // anonymous local
     let _3: Result<(), Error>[{built_in impl Sized for ()}, {built_in impl Sized for Error}]; // anonymous local
     let _4: &'1 mut Vec<u8>[{built_in impl Sized for u8}, {built_in impl Sized for Global}]; // anonymous local
@@ -84,13 +96,17 @@ fn main()
     let _8: [u8; 5usize]; // anonymous local
     let _9: &'7 [u8; 5usize]; // anonymous local
 
+    storage_live(_0)
     _0 = ()
-    storage_live(buf_1)
-    buf_1 = new<u8>[{built_in impl Sized for u8}]()
+    storage_live(buf)
+    buf = new<u8>[{built_in impl Sized for u8}]()
+    ↳⚡ unwind_continue
+    fake_read(buf)
+    set_type(typeof(buf) == Vec<u8>[{built_in impl Sized for u8}, {built_in impl Sized for Global}])
     storage_live(_2)
     storage_live(_3)
     storage_live(_4)
-    _4 = &two-phase-mut buf_1
+    _4 = &two-phase-mut buf
     storage_live(_5)
     storage_live(_6)
     storage_live(_7)
@@ -101,17 +117,35 @@ fn main()
     _7 = move _9
     _6 = &(*_7)
     _5 = @ArrayToSliceShared<'_, u8, 5usize>(move _6)
+    ↳⚡ undefined_behavior
     storage_dead(_6)
     _3 = impl_Write_for_Vec_u8::write_all<'11, '12, Global>[{built_in impl Sized for Global}](move _4, move _5)
+    ↳⚡ conditional_drop[impl_Destruct_for_Vec::drop_glue<'13, u8, Global>[{built_in impl Sized for u8}, {built_in impl Sized for Global}]] buf
+        ↳⚡ storage_dead(_9)
+            storage_dead(_8)
+            unwind_terminate
+        unwind_continue
     storage_dead(_5)
     storage_dead(_4)
     _2 = unwrap<(), Error>[{built_in impl Sized for ()}, {built_in impl Sized for Error}, impl_Debug_for_Error](move _3)
+    ↳⚡ conditional_drop[impl_Destruct_for_Result::drop_glue<'14, (), Error>[{built_in impl Sized for ()}, {built_in impl Sized for Error}]] _3
+        ↳⚡ storage_dead(_9)
+            storage_dead(_8)
+            unwind_terminate
+        conditional_drop[impl_Destruct_for_Vec::drop_glue<'13, u8, Global>[{built_in impl Sized for u8}, {built_in impl Sized for Global}]] buf
+        ↳⚡ storage_dead(_9)
+            storage_dead(_8)
+            unwind_terminate
+        unwind_continue
     storage_dead(_3)
     storage_dead(_7)
     storage_dead(_2)
     _0 = ()
-    conditional_drop[impl_Destruct_for_Vec::drop_glue<'15, u8, Global>[{built_in impl Sized for u8}, {built_in impl Sized for Global}]] buf_1
-    storage_dead(buf_1)
+    conditional_drop[impl_Destruct_for_Vec::drop_glue<'15, u8, Global>[{built_in impl Sized for u8}, {built_in impl Sized for Global}]] buf
+    ↳⚡ unwind_continue
+    storage_dead(buf)
+    storage_dead(_9)
+    storage_dead(_8)
     return
 }
 

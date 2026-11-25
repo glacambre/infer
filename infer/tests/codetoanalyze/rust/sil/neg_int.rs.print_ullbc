@@ -4,22 +4,23 @@
 fn main()
 {
     let _0: (); // return
-    let y_1: i32; // local
-    let x_2: i32; // local
+    let y: i32; // local
+    let x: i32; // local
     let _3: i32; // anonymous local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(y_1);
-        y_1 = const 1i32;
-        storage_live(x_2);
+        storage_live(y);
+        y = const 1i32;
+        storage_live(x);
         storage_live(_3);
-        _3 = copy y_1;
-        x_2 = panic.-(move _3);
+        _3 = copy y;
+        x = panic.-(move _3);
         storage_dead(_3);
         _0 = ();
-        storage_dead(x_2);
-        storage_dead(y_1);
+        storage_dead(x);
+        storage_dead(y);
         return;
     }
 }

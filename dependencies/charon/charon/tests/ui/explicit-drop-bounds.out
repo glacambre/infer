@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -21,7 +21,7 @@ pub trait Destruct<Self>
 }
 
 // Full name: alloc::string::String
-#[lang_item("String")]
+#[lang_item(String)]
 pub opaque type String
 
 // Full name: alloc::string::String::{impl Destruct for String}::drop_glue
@@ -48,33 +48,41 @@ trait Trait<Self, T>
     non-dyn-compatible
 }
 
-fn test_crate::Trait::foo<Self, T, U>(x_1: U)
+fn test_crate::Trait::foo<Self, T, U>(x: U)
 where
     TraitClause0: (Self: Trait<T>),
     TraitClause1: (U: Sized),
     TraitClause2: (U: Destruct),
 {
     let _0: (); // return
-    let x_1: U; // arg #1
+    let x: U; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
-    drop[TraitClause2::drop_glue<'0>] x_1
+    drop[TraitClause2::drop_glue<'0>] x
+    ↳⚡ storage_dead(x)
+        unwind_continue
+    storage_dead(x)
     return
 }
 
 // Full name: test_crate::{impl Trait<u32> for ()}::foo
-fn impl_Trait_u32_for_unit::foo<U>(x_1: U)
+fn impl_Trait_u32_for_unit::foo<U>(x: U)
 where
     TraitClause0: (U: Sized),
     TraitClause1: (U: Destruct),
 {
     let _0: (); // return
-    let x_1: U; // arg #1
+    let x: U; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
-    drop[TraitClause1::drop_glue<'0>] x_1
+    drop[TraitClause1::drop_glue<'0>] x
+    ↳⚡ storage_dead(x)
+        unwind_continue
+    storage_dead(x)
     return
 }
 
@@ -92,7 +100,7 @@ impl "impl_Trait_u32_for_unit" Trait<u32> for () {
 }
 
 // Full name: test_crate::use_trait
-fn use_trait<T, X>(_x_1: T, _y_2: X)
+fn use_trait<T, X>(_x: T, _y: X)
 where
     TraitClause0: (T: Sized),
     TraitClause1: (X: Sized),
@@ -101,13 +109,26 @@ where
     TraitClause4: (X: Destruct),
 {
     let _0: (); // return
-    let _x_1: T; // arg #1
-    let _y_2: X; // arg #2
+    let _x: T; // arg #1
+    let _y: X; // arg #2
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
-    drop[TraitClause4::drop_glue<'0>] _y_2
-    drop[TraitClause3::drop_glue<'1>] _x_1
+    drop[TraitClause4::drop_glue<'0>] _y
+    ↳⚡ drop[TraitClause3::drop_glue<'2>] _x
+        ↳⚡ storage_dead(_y)
+            storage_dead(_x)
+            unwind_terminate
+        storage_dead(_y)
+        storage_dead(_x)
+        unwind_continue
+    drop[TraitClause3::drop_glue<'1>] _x
+    ↳⚡ storage_dead(_y)
+        storage_dead(_x)
+        unwind_continue
+    storage_dead(_y)
+    storage_dead(_x)
     return
 }
 
@@ -118,11 +139,13 @@ fn main()
     let _1: (); // anonymous local
     let _2: (); // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_1)
     storage_live(_2)
     _2 = ()
     _1 = use_trait<u32, ()>[{built_in impl Sized for u32}, {built_in impl Sized for ()}, impl_Trait_u32_for_unit, {built_in impl Destruct for u32}, {built_in impl Destruct for ()}](const 42u32, move _2)
+    ↳⚡ unwind_continue
     storage_dead(_2)
     storage_dead(_1)
     _0 = ()

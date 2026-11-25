@@ -24,6 +24,7 @@ pub use vars::*;
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("R"))]
 pub enum Region {
@@ -47,15 +48,18 @@ pub enum Region {
 #[derive(
     Debug,
     Clone,
-    SerializeState,
-    DeserializeState,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
+    SerializeState,
+    DeserializeState,
     EnumIsA,
     EnumAsGetters,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 pub enum TraitRefKind {
     /// A specific top-level implementation item.
@@ -149,7 +153,20 @@ pub enum TraitRefKind {
 
 /// Describes a built-in impl. Mostly lists the implemented trait, sometimes with more details
 /// about the contents of the implementation.
-#[derive(Debug, Clone, SerializeState, DeserializeState, PartialEq, Eq, Hash, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Builtin"))]
 pub enum BuiltinImplData {
     /// Auto traits (defined with `auto trait ...`, also `Unpin`).
@@ -194,11 +211,37 @@ pub enum BuiltinImplData {
 /// A reference to a trait.
 ///
 /// This type is hash-consed, `TraitRefContents` contains the actual data.
-#[derive(Debug, Clone, SerializeState, DeserializeState, PartialEq, Eq, Hash, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 #[serde_state(state_implements = HashConsSerializerState)] // Avoid corecursive impls due to perfect derive
 pub struct TraitRef(pub HashConsed<TraitRefContents>);
 
-#[derive(Debug, Clone, SerializeState, DeserializeState, PartialEq, Eq, Hash, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct TraitRefContents {
     pub kind: TraitRefKind,
     /// Not necessary, but useful
@@ -213,7 +256,20 @@ pub struct TraitRefContents {
 /// ```
 ///
 /// The substitution is: `[String, bool]`.
-#[derive(Debug, Clone, SerializeState, DeserializeState, PartialEq, Eq, Hash, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct TraitDeclRef {
     pub id: TraitDeclId,
     pub generics: BoxedArgs,
@@ -223,14 +279,40 @@ pub struct TraitDeclRef {
 pub type PolyTraitDeclRef = RegionBinder<TraitDeclRef>;
 
 /// A reference to a tait impl, using the provided arguments.
-#[derive(Debug, Clone, SerializeState, DeserializeState, PartialEq, Eq, Hash, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct TraitImplRef {
     pub id: TraitImplId,
     pub generics: BoxedArgs,
 }
 
 /// .0 outlives .1
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct OutlivesPred<T, U>(pub T, pub U);
 
 pub type RegionOutlives = OutlivesPred<Region, Region>;
@@ -243,7 +325,20 @@ pub type TypeOutlives = OutlivesPred<Ty, Region>;
 /// T : Foo<S = String>
 ///         ^^^^^^^^^^
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct TraitTypeConstraint {
     pub trait_ref: TraitRef,
     pub type_id: AssocTypeId,
@@ -251,7 +346,19 @@ pub struct TraitTypeConstraint {
 }
 
 /// A set of generic arguments.
-#[derive(Clone, Eq, PartialEq, Hash, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct GenericArgs {
     pub regions: IndexVec<RegionId, Region>,
     pub types: IndexVec<TypeVarId, Ty>,
@@ -263,7 +370,20 @@ pub type BoxedArgs = Box<GenericArgs>;
 
 /// A value of type `T` bound by regions. We should use `binder` instead but this causes name clash
 /// issues in the derived ocaml visitors.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct RegionBinder<T> {
     #[cfg_attr(feature = "charon_on_charon", charon::rename("binder_regions"))]
     #[serde_state(stateless)]
@@ -274,7 +394,20 @@ pub struct RegionBinder<T> {
     pub skip_binder: T,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("BK"))]
 pub enum BinderKind {
     /// The parameters of a generic associated type.
@@ -293,7 +426,20 @@ pub enum BinderKind {
 /// A value of type `T` bound by generic parameters. Used in any context where we're adding generic
 /// parameters that aren't on the top-level item, e.g. `for<'a>` clauses (uses `RegionBinder` for
 /// now), trait methods, GATs (TODO).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct Binder<T> {
     #[cfg_attr(feature = "charon_on_charon", charon::rename("binder_params"))]
     pub params: GenericParams,
@@ -308,7 +454,18 @@ pub struct Binder<T> {
 
 /// Generic parameters for a declaration, including predicates.
 #[derive(
-    Default, Clone, PartialEq, Eq, Hash, SerializeState, DeserializeState, Drive, DriveMut,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
 )]
 pub struct GenericParams {
     #[serde_state(stateless)]
@@ -327,7 +484,20 @@ pub struct GenericParams {
 }
 
 /// Where a given predicate came from.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub enum PredicateOrigin {
     // Note: we use this for globals too, but that's only available with an unstable feature.
     // ```
@@ -379,7 +549,9 @@ pub type ByteCount = u64;
 /// Simplified layout of a single variant.
 ///
 /// Maps fields to their offset within the layout.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, Drive, DriveMut)]
+#[derive(
+    Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize, Drive, DriveMut, DriveTwo,
+)]
 pub struct VariantLayout {
     /// The offset of each field.
     #[drive(skip)]
@@ -422,18 +594,8 @@ pub enum Discriminator {
 /// If the type does not have a fully known layout (e.g. it is ?Sized)
 /// some of the layout parts are not available.
 #[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Serialize,
-    Deserialize,
-    SerializeState,
-    DeserializeState,
-    Drive,
-    DriveMut,
+    Debug, Clone, PartialEq, Eq, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
 )]
-#[serde_state(stateless)]
 pub struct Layout {
     /// The size of the type in bytes.
     #[drive(skip)]
@@ -443,6 +605,7 @@ pub struct Layout {
     pub align: Option<ByteCount>,
     /// Decision tree that determines the active variant by reading memory. Only `Some` for enums.
     #[drive(skip)]
+    #[serde_state(stateless)]
     pub discriminator: Option<Discriminator>,
     /// Whether the type is uninhabited, i.e. has any valid value at all.
     /// Note that uninhabited types can have arbitrary layouts: `(u32, !)` has space for the `u32`
@@ -452,6 +615,7 @@ pub struct Layout {
     /// Map from `VariantId` to the corresponding field layouts. Some variants don't have a
     /// meaningful layout due to being uninhabited (though an uninhabited variant may have a
     /// layout). Structs and unions are modeled as having exactly one variant.
+    #[serde_state(stateless)]
     pub variant_layouts: IndexVec<VariantId, Option<VariantLayout>>,
     /// The representation options of this type declaration as annotated by the user.
     #[drive(skip)]
@@ -462,7 +626,20 @@ pub struct Layout {
 /// The metadata stored in a pointer. That's the information stored in pointers alongside
 /// their address. It's empty for `Sized` types, and interesting for unsized
 /// aka dynamically-sized types.
-#[derive(Debug, Clone, PartialEq, Eq, SerializeState, DeserializeState, Drive, DriveMut, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 #[serde_state(default_state = ())]
 pub enum PtrMetadata {
     /// Types that need no metadata, namely `T: Sized` types.
@@ -528,7 +705,9 @@ pub struct ReprOptions {
 ///
 /// A type can only be an ADT (structure or enumeration), as type aliases are
 /// inlined in MIR.
-#[derive(Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
+)]
 #[serde_state(state_implements = HashConsSerializerState)]
 pub struct TypeDecl {
     pub def_id: TypeDeclId,
@@ -561,6 +740,7 @@ generate_index_type!(FieldId, "Field");
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 pub enum TypeDeclKind {
     Struct(IndexVec<FieldId, Field>),
@@ -580,12 +760,13 @@ pub enum TypeDeclKind {
     Error(String),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
+)]
 #[serde_state(stateless)]
 pub struct Variant {
     pub id: VariantId,
     pub span: Span,
-    #[drive(skip)]
     pub attr_info: AttrInfo,
     #[cfg_attr(feature = "charon_on_charon", charon::rename("variant_name"))]
     #[drive(skip)]
@@ -598,15 +779,19 @@ pub struct Variant {
     pub discriminant: Literal,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
+)]
 #[serde_state(stateless)]
 pub struct Field {
     pub span: Span,
-    #[drive(skip)]
     pub attr_info: AttrInfo,
     #[cfg_attr(feature = "charon_on_charon", charon::rename("field_name"))]
     #[drive(skip)]
-    pub name: Option<String>,
+    pub name: String,
+    /// Whether this field is positional, as in a tuple struct, tuple variant, or closure. If so,
+    /// its name is based on its position, such as `_0`; otherwise, it is a user-provided name.
+    pub is_positional: bool,
     #[cfg_attr(feature = "charon_on_charon", charon::rename("field_ty"))]
     #[serde_state(stateful)]
     pub ty: Ty,
@@ -624,6 +809,7 @@ pub struct Field {
     Deserialize,
     Drive,
     DriveMut,
+    DriveTwo,
     Hash,
     Ord,
     PartialOrd,
@@ -649,6 +835,7 @@ pub enum IntTy {
     Deserialize,
     Drive,
     DriveMut,
+    DriveTwo,
     Hash,
     Ord,
     PartialOrd,
@@ -674,6 +861,7 @@ pub enum UIntTy {
     Deserialize,
     Drive,
     DriveMut,
+    DriveTwo,
     Hash,
     Ord,
     PartialOrd,
@@ -696,6 +884,7 @@ pub enum IntegerTy {
     Deserialize,
     Drive,
     DriveMut,
+    DriveTwo,
     Hash,
     Ord,
     PartialOrd,
@@ -723,6 +912,7 @@ pub enum FloatTy {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
     Ord,
     PartialOrd,
 )]
@@ -764,6 +954,7 @@ pub enum LifetimeMutability {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
     Hash,
     Ord,
     PartialOrd,
@@ -790,7 +981,20 @@ pub enum TypeId {
 }
 
 /// Reference to a type declaration or builtin type.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct TypeDeclRef {
     pub id: TypeId,
     pub generics: BoxedArgs,
@@ -813,6 +1017,7 @@ pub struct TypeDeclRef {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
     Hash,
     Ord,
     PartialOrd,
@@ -832,7 +1037,20 @@ pub enum LiteralTy {
 ///
 /// Warning: the `DriveMut` impls of `Ty` needs to clone and re-hash the modified type to maintain
 /// the hash-consing invariant. This is expensive, avoid visiting types mutably when not needed.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 #[serde_state(state_implements = HashConsSerializerState)] // Avoid corecursive impls due to perfect derive
 pub struct Ty(pub HashConsed<TyKind>);
 
@@ -841,6 +1059,8 @@ pub struct Ty(pub HashConsed<TyKind>);
     Clone,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     VariantName,
     EnumIsA,
@@ -851,6 +1071,7 @@ pub struct Ty(pub HashConsed<TyKind>);
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("T"))]
 pub enum TyKind {
@@ -953,6 +1174,7 @@ pub enum TyKind {
     Deserialize,
     Drive,
     DriveMut,
+    DriveTwo,
     Hash,
     Ord,
     PartialOrd,
@@ -978,6 +1200,7 @@ pub enum BuiltinTy {
     Deserialize,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 pub enum ClosureKind {
     Fn,
@@ -997,7 +1220,19 @@ impl ClosureKind {
 }
 
 /// Additional information for closures.
-#[derive(Debug, Clone, PartialEq, Eq, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct ClosureInfo {
     #[serde_state(stateless)]
     pub kind: ClosureKind,
@@ -1012,7 +1247,20 @@ pub struct ClosureInfo {
 }
 
 /// A function signature.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct FunSig {
     /// Is the function unsafe or not
     #[drive(skip)]
@@ -1020,6 +1268,9 @@ pub struct FunSig {
     /// The calling convention of this function.
     #[drive(skip)]
     pub abi: Abi,
+    /// Whether this is a C-variadic function (its last parameter is `...`).
+    #[drive(skip)]
+    pub is_variadic: bool,
     pub inputs: Vec<Ty>,
     pub output: Ty,
 }
@@ -1029,6 +1280,8 @@ pub struct FunSig {
     Clone,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     VariantName,
     EnumIsA,
@@ -1036,6 +1289,7 @@ pub struct FunSig {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[serde_state(stateless)]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Abi"))]
@@ -1061,7 +1315,20 @@ impl Abi {
 }
 
 /// The contents of a `dyn Trait` type.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct DynPredicate {
     /// This binder binds a single type `T`, which is considered existentially quantified. The
     /// predicates in the binder apply to `T` and represent the `dyn Trait` constraints.
@@ -1078,6 +1345,8 @@ pub struct DynPredicate {
     Clone,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     VariantName,
     EnumIsA,
@@ -1085,6 +1354,7 @@ pub struct DynPredicate {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[serde_state(state_implements = HashConsSerializerState)] // Avoid corecursive impls due to perfect derive
 pub enum TypePattern {

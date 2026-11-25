@@ -6,6 +6,7 @@ fn X() -> i32
     let _0: i32; // return
 
     bb0: {
+        storage_live(_0);
         _0 = const 5i32;
         return;
     }
@@ -15,20 +16,23 @@ fn X() -> i32
 const X: i32 = X()
 
 // Full name: global_place::succ
-fn succ(i_1: i32) -> i32
+fn succ(i: i32) -> i32
 {
     let _0: i32; // return
-    let i_1: i32; // arg #1
+    let i: i32; // arg #1
     let _2: i32; // anonymous local
     let _3: i32; // anonymous local
 
     bb0: {
+        storage_live(_0);
         storage_live(_3);
         storage_live(_2);
-        _2 = copy i_1;
+        _2 = copy i;
         _3 = copy _2 panic.+ const 1i32;
         _0 = move _3;
         storage_dead(_2);
+        storage_dead(_3);
+        storage_dead(i);
         return;
     }
 }
@@ -39,6 +43,7 @@ fn Y() -> i32
     let _0: i32; // return
 
     bb0: {
+        storage_live(_0);
         _0 = succ(copy X) -> bb2 (unwind: bb1);
     }
 
@@ -58,17 +63,19 @@ const Y: i32 = Y()
 fn main()
 {
     let _0: (); // return
-    let eleven_1: i32; // local
+    let eleven: i32; // local
     let _2: i32; // anonymous local
 
     bb0: {
+        storage_live(_0);
         storage_live(_2);
         _0 = ();
-        storage_live(eleven_1);
+        storage_live(eleven);
         _2 = copy X panic.+ copy Y;
-        eleven_1 = move _2;
+        eleven = move _2;
         _0 = ();
-        storage_dead(eleven_1);
+        storage_dead(eleven);
+        storage_dead(_2);
         return;
     }
 }

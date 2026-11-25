@@ -31,7 +31,7 @@ impl Transform {
                         .is_global_initializer
                         .and_then(|gid| ctx.translated.global_decls.get(gid))
                         .is_some_and(|gdecl| matches!(gdecl.global_kind, GlobalKind::AnonConst));
-                    let is_vec_construction_fn = decl.item_meta.lang_item.as_deref()
+                    let is_vec_construction_fn = decl.item_meta.diagnostic_item.as_deref()
                         == Some(builtins::BOX_ASSUME_INIT_INTO_VEC_UNSAFE);
                     is_local_panic_fn
                         || (is_anon_const_initializer && !ctx.options.raw_consts)
@@ -116,20 +116,20 @@ impl UllbcPass for Transform {
                 .locals
                 .extend(mem::take(&mut inner_body.locals.locals));
 
-            // The inner body assumes the return and arg places are live; allocate them, and
-            // initialize the args.
+            // The inner body assumes the arg places are live; allocate them, and initialize the
+            // args.
             inner_body.body[0].statements.splice(
                 0..0,
-                [StatementKind::StorageLive(return_local)]
-                    .into_iter()
-                    .chain(args.into_iter().enumerate().flat_map(|(i, arg)| {
+                args.into_iter()
+                    .enumerate()
+                    .flat_map(|(i, arg)| {
                         let arg_local = return_local + i + 1;
                         let arg_place = outer_body.locals.place_for_var(arg_local);
                         [
                             StatementKind::StorageLive(arg_local),
                             StatementKind::Assign(arg_place, Rvalue::Use(arg, WithRetag::Yes)),
                         ]
-                    }))
+                    })
                     .map(|kind| Statement::new(span, kind)),
             );
 

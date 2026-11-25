@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
 
@@ -40,6 +41,7 @@ pub trait AstFormatter: Sized {
     fn binder_depth(&self) -> usize;
 
     fn increase_indent<'a>(&'a self) -> Self::Reborrow<'a>;
+    fn reset_indent<'a>(&'a self) -> Self::Reborrow<'a>;
     fn indent(&self) -> String;
 
     fn format_local_id(&self, f: &mut fmt::Formatter<'_>, id: LocalId) -> fmt::Result;
@@ -137,10 +139,10 @@ pub trait AstFormatter: Sized {
         {
             match (&def.kind, opt_variant_id) {
                 (TypeDeclKind::Enum(variants), Some(variant_id)) => {
-                    variants[variant_id].fields[field_id].name.as_ref()
+                    Some(&variants[variant_id].fields[field_id].name)
                 }
                 (TypeDeclKind::Struct(fields) | TypeDeclKind::Union(fields), None) => {
-                    fields[field_id].name.as_ref()
+                    Some(&fields[field_id].name)
                 }
                 _ => None,
             }
@@ -162,7 +164,7 @@ pub struct FmtCtx<'a> {
     /// Generics form a stack, where each binder introduces a new level. For DeBruijn indices to
     /// work, we keep the innermost parameters at the start of the vector.
     pub generics: BindingStack<Cow<'a, GenericParams>>,
-    pub locals: Option<&'a Locals>,
+    pub local_names: Option<IndexVec<LocalId, String>>,
     pub indent_level: usize,
 }
 
@@ -190,7 +192,7 @@ impl<'c> AstFormatter for FmtCtx<'c> {
     }
     fn set_locals<'a>(&'a self, locals: &'a Locals) -> Self::Reborrow<'a> {
         FmtCtx {
-            locals: Some(locals),
+            local_names: Some(compute_local_names(locals)),
             ..self.reborrow()
         }
     }
@@ -209,15 +211,19 @@ impl<'c> AstFormatter for FmtCtx<'c> {
             ..self.reborrow()
         }
     }
+    fn reset_indent<'a>(&'a self) -> Self::Reborrow<'a> {
+        FmtCtx {
+            indent_level: 0,
+            ..self.reborrow()
+        }
+    }
     fn indent(&self) -> String {
         TAB_INCR.repeat(self.indent_level)
     }
 
     fn format_local_id(&self, f: &mut fmt::Formatter<'_>, id: LocalId) -> fmt::Result {
-        if let Some(locals) = &self.locals
-            && let Some(v) = locals.locals.get(id)
-        {
-            write!(f, "{v}")
+        if let Some(local_names) = &self.local_names {
+            write!(f, "{}", local_names[id])
         } else {
             write!(f, "_{id}")
         }
@@ -287,8 +293,39 @@ impl<'a> FmtCtx<'a> {
         FmtCtx {
             translated: self.translated,
             generics: self.generics.clone(),
-            locals: self.locals,
+            local_names: self.local_names.clone(),
             indent_level: self.indent_level,
         }
     }
+}
+
+/// Compute a unique name for each local.
+pub fn compute_local_names(locals: &Locals) -> IndexVec<LocalId, String> {
+    let mut local_names = locals.locals.map_ref(|local| {
+        format!(
+            "{}_{}",
+            local.name.as_deref().unwrap_or_default(),
+            local.index
+        )
+    });
+
+    let mut name_counts = HashMap::<String, usize>::new();
+    for local in &locals.locals {
+        *name_counts
+            .entry(local_names[local.index].clone())
+            .or_default() += 1;
+        if let Some(name) = &local.name {
+            *name_counts.entry(name.clone()).or_default() += 1;
+        }
+    }
+
+    for (id, local) in locals.locals.iter_enumerated() {
+        if let Some(name) = &local.name
+            && !name.is_empty()
+            && name_counts[name] == 1
+        {
+            local_names[id] = name.clone();
+        }
+    }
+    local_names
 }

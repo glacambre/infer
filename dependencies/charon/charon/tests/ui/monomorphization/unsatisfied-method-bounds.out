@@ -3,7 +3,7 @@
 opaque type core::marker::MetaSized::{vtable}
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 struct test_crate::MyIterator::{vtable} {
@@ -25,13 +25,15 @@ trait MyIterator<Self>
 struct A {}
 
 // Full name: test_crate::MyIterator::method::<A>
-fn method::<A><'_0>(self_1: &'_0 A)
+fn method::<A><'_0>(self: &'_0 A)
 {
     let _0: (); // return
-    let self_1: &'1 A; // arg #1
+    let self: &'1 A; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
+    storage_dead(self)
     return
 }
 
@@ -39,13 +41,15 @@ fn method::<A><'_0>(self_1: &'_0 A)
 struct B {}
 
 // Full name: test_crate::MyIterator::method::<B>
-fn method::<B><'_0>(self_1: &'_0 B)
+fn method::<B><'_0>(self: &'_0 B)
 {
     let _0: (); // return
-    let self_1: &'1 B; // arg #1
+    let self: &'1 B; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
+    storage_dead(self)
     return
 }
 
@@ -72,6 +76,7 @@ fn main()
     _10 = A {  }
     _9 = &_10
     _7 = move _9
+    storage_live(_0)
     storage_live(_5)
     storage_live(_6)
     _0 = ()
@@ -80,6 +85,9 @@ fn main()
     _6 = move _7
     _2 = &(*_6)
     _1 = method::<A><'8>(move _2)
+    ↳⚡ storage_dead(_6)
+        storage_dead(_5)
+        unwind_continue
     storage_live(_8)
     storage_live(_11)
     storage_live(_12)
@@ -93,9 +101,20 @@ fn main()
     _5 = move _8
     _4 = &(*_5)
     _3 = method::<B><'11>(move _4)
+    ↳⚡ storage_dead(_6)
+        storage_dead(_5)
+        unwind_continue
     storage_dead(_4)
     storage_dead(_3)
     _0 = ()
+    storage_dead(_6)
+    storage_dead(_5)
+    storage_dead(_12)
+    storage_dead(_11)
+    storage_dead(_10)
+    storage_dead(_9)
+    storage_dead(_8)
+    storage_dead(_7)
     return
 }
 

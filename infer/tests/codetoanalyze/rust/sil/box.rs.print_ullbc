@@ -1,7 +1,7 @@
 # Final ULLBC before serialization:
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -9,7 +9,7 @@ pub trait Destruct<Self>
 }
 
 // Full name: alloc::alloc::Global
-#[lang_item("global_alloc_ty")]
+#[lang_item(GlobalAlloc)]
 pub struct Global {}
 
 // Full name: alloc::alloc::Global::{impl Destruct for Global}::drop_glue
@@ -27,18 +27,21 @@ unsafe fn impl_Destruct_for_Box::drop_glue<'_0, T, A>(_1: &'_0 mut alloc::boxed:
 where
     TraitClause0: (T: Destruct),
     TraitClause1: (A: Destruct),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: A: '_0,
 = <opaque>
 
 // Full name: box::main
 fn main()
 {
     let _0: (); // return
-    let b_1: alloc::boxed::Box<i32>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]; // local
+    let b: alloc::boxed::Box<i32>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]; // local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(b_1);
-        b_1 = @BoxNew<i32>[{built_in impl Destruct for i32}](const 42i32) -> bb2 (unwind: bb1);
+        storage_live(b);
+        b = @BoxNew<i32>[{built_in impl Destruct for i32}](const 42i32) -> bb2 (unwind: bb1);
     }
 
     bb1: {
@@ -47,16 +50,16 @@ fn main()
 
     bb2: {
         _0 = ();
-        drop[impl_Destruct_for_Box::drop_glue<'0, i32, Global>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]] b_1 -> bb3 (unwind: bb4);
+        drop[impl_Destruct_for_Box::drop_glue<'0, i32, Global>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]] b -> bb4 (unwind: bb3);
     }
 
     bb3: {
-        storage_dead(b_1);
-        return;
+        unwind_continue;
     }
 
     bb4: {
-        unwind_continue;
+        storage_dead(b);
+        return;
     }
 }
 

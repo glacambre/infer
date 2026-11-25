@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: alloc::alloc::Global
-#[lang_item("global_alloc_ty")]
+#[lang_item(GlobalAlloc)]
 pub struct Global {}
 
 // Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_glue
@@ -21,10 +21,12 @@ unsafe fn impl_Destruct_for_Box::drop_glue<'_0, T, A>(_1: &'_0 mut alloc::boxed:
 where
     TraitClause0: (T: MetaSized),
     TraitClause1: (A: Sized),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: A: '_0,
 = <opaque>
 
 // Full name: alloc::rc::Rc
-#[lang_item("Rc")]
+#[diagnostic_item("Rc")]
 pub opaque type Rc<T>
 where
     TraitClause0: (T: MetaSized),
@@ -35,6 +37,8 @@ unsafe fn impl_Destruct_for_Rc::drop_glue<'_0, T, A>(_1: &'_0 mut Rc<T>[TraitCla
 where
     TraitClause0: (T: MetaSized),
     TraitClause1: (A: Sized),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: A: '_0,
 = <opaque>
 
 pub fn alloc::rc::{Rc<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]}::new<T>(_1: T) -> Rc<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]
@@ -43,14 +47,14 @@ where
 = <opaque>
 
 // Full name: alloc::string::String
-#[lang_item("String")]
+#[lang_item(String)]
 pub opaque type String
 
 // Full name: alloc::string::String::{impl Destruct for String}::drop_glue
 unsafe fn impl_Destruct_for_String::drop_glue<'_0>(_1: &'_0 mut String)
 = <opaque>
 
-#[lang_item("string_new")]
+#[diagnostic_item("string_new")]
 pub fn alloc::string::{String}::new() -> String
 = <opaque>
 
@@ -74,7 +78,7 @@ impl "impl_Display_for_String" Display for String {
 fn foo()
 {
     let _0: (); // return
-    let array_1: [i32; 2usize]; // local
+    let array: [i32; 2usize]; // local
     let _2: &'1 [i32]; // anonymous local
     let _3: &'3 [i32; 2usize]; // anonymous local
     let _4: &'4 [i32; 2usize]; // anonymous local
@@ -84,7 +88,7 @@ fn foo()
     let _8: Rc<[i32]>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}]; // anonymous local
     let _9: Rc<[i32; 2usize]>[{built_in impl MetaSized for [i32; 2usize]}, {built_in impl Sized for Global}]; // anonymous local
     let _10: [i32; 2usize]; // anonymous local
-    let string_11: String; // local
+    let string: String; // local
     let _12: &'8 (dyn Display + '9); // anonymous local
     let _13: &'11 String; // anonymous local
     let _14: &'12 String; // anonymous local
@@ -97,83 +101,143 @@ fn foo()
     let _21: String; // anonymous local
     let _22: &'24 String; // anonymous local
 
+    storage_live(_0)
     _0 = ()
-    storage_live(array_1)
-    array_1 = @ArrayRepeat<i32, 2usize>(const 0i32)
+    storage_live(array)
+    array = @ArrayRepeat<i32, 2usize>(const 0i32)
+    ↳⚡ undefined_behavior
+    fake_read(array)
+    set_type(typeof(array) == [i32; 2usize])
     storage_live(_2)
     storage_live(_3)
     storage_live(_4)
-    _4 = &array_1
+    _4 = &array
     _3 = &(*_4)
     _2 = @ArrayToSliceShared<'_, i32, 2usize>(move _3)
+    ↳⚡ undefined_behavior
     storage_dead(_3)
+    set_type(typeof(_2) <= &'26 [i32])
     storage_dead(_4)
     storage_dead(_2)
     storage_live(_5)
     storage_live(_6)
     storage_live(_7)
-    _7 = copy array_1
+    _7 = copy array
     _6 = @BoxNew<[i32; 2usize]>[{built_in impl Sized for [i32; 2usize]}](move _7)
+    ↳⚡ unwind_continue
     _5 = unsize_cast<alloc::boxed::Box<[i32; 2usize]>[{built_in impl MetaSized for [i32; 2usize]}, {built_in impl Sized for Global}], alloc::boxed::Box<[i32]>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}], 2usize>(move _6)
-    conditional_drop[impl_Destruct_for_Box::drop_glue<'26, [i32; 2usize], Global>[{built_in impl MetaSized for [i32; 2usize]}, {built_in impl Sized for Global}]] _6
+    conditional_drop[impl_Destruct_for_Box::drop_glue<'27, [i32; 2usize], Global>[{built_in impl MetaSized for [i32; 2usize]}, {built_in impl Sized for Global}]] _6
+    ↳⚡ conditional_drop[impl_Destruct_for_Box::drop_glue<'29, [i32], Global>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}]] _5
+        ↳⚡ unwind_terminate
+        unwind_continue
     storage_dead(_7)
     storage_dead(_6)
-    conditional_drop[impl_Destruct_for_Box::drop_glue<'27, [i32], Global>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}]] _5
+    set_type(typeof(_5) <= alloc::boxed::Box<[i32]>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}])
+    conditional_drop[impl_Destruct_for_Box::drop_glue<'28, [i32], Global>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}]] _5
+    ↳⚡ unwind_continue
     storage_dead(_5)
     storage_live(_8)
     storage_live(_9)
     storage_live(_10)
-    _10 = copy array_1
+    _10 = copy array
     _9 = alloc::rc::{Rc<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]}::new<[i32; 2usize]>[{built_in impl Sized for [i32; 2usize]}](move _10)
+    ↳⚡ unwind_continue
     _8 = unsize_cast<Rc<[i32; 2usize]>[{built_in impl MetaSized for [i32; 2usize]}, {built_in impl Sized for Global}], Rc<[i32]>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}], ?>(move _9)
-    conditional_drop[impl_Destruct_for_Rc::drop_glue<'29, [i32; 2usize], Global>[{built_in impl MetaSized for [i32; 2usize]}, {built_in impl Sized for Global}]] _9
+    conditional_drop[impl_Destruct_for_Rc::drop_glue<'30, [i32; 2usize], Global>[{built_in impl MetaSized for [i32; 2usize]}, {built_in impl Sized for Global}]] _9
+    ↳⚡ conditional_drop[impl_Destruct_for_Rc::drop_glue<'32, [i32], Global>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}]] _8
+        ↳⚡ unwind_terminate
+        unwind_continue
     storage_dead(_10)
     storage_dead(_9)
-    conditional_drop[impl_Destruct_for_Rc::drop_glue<'30, [i32], Global>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}]] _8
+    set_type(typeof(_8) <= Rc<[i32]>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}])
+    conditional_drop[impl_Destruct_for_Rc::drop_glue<'31, [i32], Global>[{built_in impl MetaSized for [i32]}, {built_in impl Sized for Global}]] _8
+    ↳⚡ unwind_continue
     storage_dead(_8)
-    storage_live(string_11)
-    string_11 = alloc::string::{String}::new()
+    storage_live(string)
+    string = alloc::string::{String}::new()
+    ↳⚡ unwind_continue
+    fake_read(string)
     storage_live(_12)
     storage_live(_13)
     storage_live(_14)
-    _14 = &string_11
+    _14 = &string
     _13 = &(*_14)
-    _12 = unsize_cast<&'11 String, &'32 (dyn Display + '33), &impl_Display_for_String::{vtable}>(move _13)
+    _12 = unsize_cast<&'11 String, &'33 (dyn Display + '34), &impl_Display_for_String::{vtable}>(move _13)
     storage_dead(_13)
+    set_type(typeof(_12) <= &'35 (dyn Display + '36))
     storage_dead(_14)
     storage_dead(_12)
     storage_live(_15)
     storage_live(_16)
     storage_live(_17)
     storage_live(_18)
-    _18 = &string_11
-    _17 = clone<'35>(move _18)
+    _18 = &string
+    _17 = clone<'38>(move _18)
+    ↳⚡ conditional_drop[impl_Destruct_for_String::drop_glue<'39>] string
+        ↳⚡ unwind_terminate
+        unwind_continue
     storage_dead(_18)
     _16 = @BoxNew<String>[{built_in impl Sized for String}](move _17)
-    _15 = unsize_cast<alloc::boxed::Box<String>[{built_in impl MetaSized for String}, {built_in impl Sized for Global}], alloc::boxed::Box<(dyn Display + '38)>[{built_in impl MetaSized for (dyn Display + '39)}, {built_in impl Sized for Global}], &impl_Display_for_String::{vtable}>(move _16)
-    conditional_drop[impl_Destruct_for_Box::drop_glue<'40, String, Global>[{built_in impl MetaSized for String}, {built_in impl Sized for Global}]] _16
+    ↳⚡ conditional_drop[impl_Destruct_for_String::drop_glue<'40>] _17
+        ↳⚡ unwind_terminate
+        conditional_drop[impl_Destruct_for_String::drop_glue<'39>] string
+        ↳⚡ unwind_terminate
+        unwind_continue
+    _15 = unsize_cast<alloc::boxed::Box<String>[{built_in impl MetaSized for String}, {built_in impl Sized for Global}], alloc::boxed::Box<(dyn Display + '41)>[{built_in impl MetaSized for (dyn Display + '42)}, {built_in impl Sized for Global}], &impl_Display_for_String::{vtable}>(move _16)
+    conditional_drop[impl_Destruct_for_Box::drop_glue<'43, String, Global>[{built_in impl MetaSized for String}, {built_in impl Sized for Global}]] _16
+    ↳⚡ conditional_drop[impl_Destruct_for_String::drop_glue<'56>] _17
+        ↳⚡ unwind_terminate
+        conditional_drop[impl_Destruct_for_Box::drop_glue<'68, (dyn Display + '65), Global>[{built_in impl MetaSized for (dyn Display + '65)}, {built_in impl Sized for Global}]] _15
+        ↳⚡ unwind_terminate
+        conditional_drop[impl_Destruct_for_String::drop_glue<'39>] string
+        ↳⚡ unwind_terminate
+        unwind_continue
     storage_dead(_17)
     storage_dead(_16)
-    conditional_drop[impl_Destruct_for_Box::drop_glue<'50, (dyn Display + '47), Global>[{built_in impl MetaSized for (dyn Display + '47)}, {built_in impl Sized for Global}]] _15
+    set_type(typeof(_15) <= alloc::boxed::Box<(dyn Display + '44)>[{built_in impl MetaSized for (dyn Display + '45)}, {built_in impl Sized for Global}])
+    conditional_drop[impl_Destruct_for_Box::drop_glue<'55, (dyn Display + '52), Global>[{built_in impl MetaSized for (dyn Display + '52)}, {built_in impl Sized for Global}]] _15
+    ↳⚡ conditional_drop[impl_Destruct_for_String::drop_glue<'39>] string
+        ↳⚡ unwind_terminate
+        unwind_continue
     storage_dead(_15)
     storage_live(_19)
     storage_live(_20)
     storage_live(_21)
     storage_live(_22)
-    _22 = &string_11
-    _21 = clone<'53>(move _22)
+    _22 = &string
+    _21 = clone<'58>(move _22)
+    ↳⚡ conditional_drop[impl_Destruct_for_String::drop_glue<'39>] string
+        ↳⚡ unwind_terminate
+        unwind_continue
     storage_dead(_22)
     _20 = alloc::rc::{Rc<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]}::new<String>[{built_in impl Sized for String}](move _21)
-    _19 = unsize_cast<Rc<String>[{built_in impl MetaSized for String}, {built_in impl Sized for Global}], Rc<(dyn Display + '65)>[{built_in impl MetaSized for (dyn Display + '66)}, {built_in impl Sized for Global}], ?>(move _20)
-    conditional_drop[impl_Destruct_for_Rc::drop_glue<'67, String, Global>[{built_in impl MetaSized for String}, {built_in impl Sized for Global}]] _20
+    ↳⚡ conditional_drop[impl_Destruct_for_String::drop_glue<'69>] _21
+        ↳⚡ unwind_terminate
+        conditional_drop[impl_Destruct_for_String::drop_glue<'39>] string
+        ↳⚡ unwind_terminate
+        unwind_continue
+    _19 = unsize_cast<Rc<String>[{built_in impl MetaSized for String}, {built_in impl Sized for Global}], Rc<(dyn Display + '70)>[{built_in impl MetaSized for (dyn Display + '71)}, {built_in impl Sized for Global}], ?>(move _20)
+    conditional_drop[impl_Destruct_for_Rc::drop_glue<'72, String, Global>[{built_in impl MetaSized for String}, {built_in impl Sized for Global}]] _20
+    ↳⚡ conditional_drop[impl_Destruct_for_String::drop_glue<'85>] _21
+        ↳⚡ unwind_terminate
+        conditional_drop[impl_Destruct_for_Rc::drop_glue<'96, (dyn Display + '93), Global>[{built_in impl MetaSized for (dyn Display + '93)}, {built_in impl Sized for Global}]] _19
+        ↳⚡ unwind_terminate
+        conditional_drop[impl_Destruct_for_String::drop_glue<'39>] string
+        ↳⚡ unwind_terminate
+        unwind_continue
     storage_dead(_21)
     storage_dead(_20)
-    conditional_drop[impl_Destruct_for_Rc::drop_glue<'77, (dyn Display + '74), Global>[{built_in impl MetaSized for (dyn Display + '74)}, {built_in impl Sized for Global}]] _19
+    set_type(typeof(_19) <= Rc<(dyn Display + '73)>[{built_in impl MetaSized for (dyn Display + '74)}, {built_in impl Sized for Global}])
+    conditional_drop[impl_Destruct_for_Rc::drop_glue<'84, (dyn Display + '81), Global>[{built_in impl MetaSized for (dyn Display + '81)}, {built_in impl Sized for Global}]] _19
+    ↳⚡ conditional_drop[impl_Destruct_for_String::drop_glue<'39>] string
+        ↳⚡ unwind_terminate
+        unwind_continue
     storage_dead(_19)
     _0 = ()
-    conditional_drop[impl_Destruct_for_String::drop_glue<'79>] string_11
-    storage_dead(string_11)
-    storage_dead(array_1)
+    conditional_drop[impl_Destruct_for_String::drop_glue<'86>] string
+    ↳⚡ unwind_continue
+    storage_dead(string)
+    storage_dead(array)
     return
 }
 

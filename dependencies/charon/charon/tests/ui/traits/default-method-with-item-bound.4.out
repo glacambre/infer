@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -43,22 +43,25 @@ struct Empty<T>
 where
     TraitClause0: (T: Sized),
 {
-  T,
+  _0: T,
 }
 
 // Full name: test_crate::{impl Trait for Empty<T>[TraitClause0]}::provided
-fn provided<'_0, T, P>(self_1: &'_0 mut Empty<T>[TraitClause0])
+fn provided<'_0, T, P>(self: &'_0 mut Empty<T>[TraitClause0])
 where
     TraitClause0: (T: Sized),
     TraitClause1: (P: Sized),
     TraitClause2: (P: Has<TraitClause3::ImpliedClause1::Item>),
     TraitClause3: (Empty<T>[TraitClause0]: Exact),
+    TypeOutlives0: T: '_0,
 {
     let _0: (); // return
-    let self_1: &'1 mut Empty<T>[TraitClause0]; // arg #1
+    let self: &'1 mut Empty<T>[TraitClause0]; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
+    storage_dead(self)
     return
 }
 

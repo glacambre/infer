@@ -3,35 +3,36 @@
 // Full name: enum::Types
 enum Types {
   Unit,
-  Value(i32),
-  Tuple(i32, i32),
-  Named(id: i32),
+  Value { _0: i32 },
+  Tuple { _0: i32, _1: i32 },
+  Named { id: i32 },
 }
 
 // Full name: enum::main
 fn main()
 {
     let _0: (); // return
-    let tunit_1: Types; // local
-    let tvalue_2: Types; // local
-    let ttype_3: Types; // local
-    let tname_4: Types; // local
+    let tunit: Types; // local
+    let tvalue: Types; // local
+    let ttype: Types; // local
+    let tname: Types; // local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(tunit_1);
-        tunit_1 = Types::Unit {  };
-        storage_live(tvalue_2);
-        tvalue_2 = Types::Value { 0: const 10i32 };
-        storage_live(ttype_3);
-        ttype_3 = Types::Tuple { 0: const 20i32, 1: const 30i32 };
-        storage_live(tname_4);
-        tname_4 = Types::Named { id: const 40i32 };
+        storage_live(tunit);
+        tunit = Types::Unit {  };
+        storage_live(tvalue);
+        tvalue = Types::Value { _0: const 10i32 };
+        storage_live(ttype);
+        ttype = Types::Tuple { _0: const 20i32, _1: const 30i32 };
+        storage_live(tname);
+        tname = Types::Named { id: const 40i32 };
         _0 = ();
-        storage_dead(tname_4);
-        storage_dead(ttype_3);
-        storage_dead(tvalue_2);
-        storage_dead(tunit_1);
+        storage_dead(tname);
+        storage_dead(ttype);
+        storage_dead(tvalue);
+        storage_dead(tunit);
         return;
     }
 }

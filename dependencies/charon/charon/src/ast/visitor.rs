@@ -11,6 +11,7 @@
 //!
 //! Underneath it all, this uses `derive_generic_visitor::Drive[Mut]` to do the actual visiting.
 use std::mem;
+use std::path::PathBuf;
 use std::{any::Any, hash::Hash};
 
 use crate::ast::*;
@@ -39,22 +40,24 @@ use derive_generic_visitor::*;
     // Defines the `Visit[Mut]` traits and the `drive[_mut]` method that drives them.
     visitor(drive(&VisitAst)),
     visitor(drive_mut(&mut VisitAstMut)),
+    visitor(drive_two(&two ZipAst)),
     // Types that we ignore.
-    skip((), String, bool),
+    skip((), String, PathBuf, bool),
     // Types that we unconditionally explore.
     drive(
-        Assert, BinderKind, BinOp, BorrowKind, BuiltinAssertKind, BuiltinFunId, BuiltinIndexOp, BuiltinTy,
+        Assert, Attribute, AttrInfo, BinderKind, BinOp, BorrowckStatement, BorrowKind, BuiltinAssertKind, BuiltinFunId, BuiltinIndexOp, BuiltinTy,
         Call, CastKind, ClosureInfo, ClosureKind, ConstGenericParam, ConstGenericVarId,
         Disambiguator, DynPredicate, Field, FieldId, FieldProjKind, File, FloatTy, FloatValue,
-        FnOperand, FunId, FnPtrKind, FunSig, IntegerTy, IntTy, UIntTy, Literal, LiteralTy,
+        FnOperand, FunId, FnPtrKind, FunSig, InlineAttr, IntegerTy, IntTy, UIntTy, Literal, LiteralTy,
         llbc_ast::ExprBody, llbc_ast::StatementKind, llbc_ast::Switch,
         Loc, Locals, NullOp, Operand, PathElem, PlaceKind, ConstantExprKind,
-        RefKind, RegionId, RegionParam, ScalarValue, TraitItemName, TraitMethodId, AssocTypeId, AssocConstId, AssocItemId,
-        TranslatedCrate, TypeDeclKind, TypeId, TypeParam, TypePattern, TypeVarId, llbc_ast::StatementId,
+        RawAttribute, RefKind, RegionId, RegionParam, ScalarValue, TraitItemName, TraitMethodId, AssocTypeId, AssocConstId, AssocItemId,
+        TranslatedCrate, TypeDeclKind, TypeId, TypeParam, TypePattern, TypeVarId,
+        llbc_ast::BlockId, llbc_ast::StatementId,
         ullbc_ast::BlockData, ullbc_ast::BlockId, ullbc_ast::ExprBody, ullbc_ast::StatementKind,
         ullbc_ast::TerminatorKind, ullbc_ast::SwitchTargets,
-        UnOp, UnsizingMetadata, Local, Variant, VariantId, LocalId, CopyNonOverlapping, Layout, VariantLayout, PtrMetadata,
-        SpanData, TraitAssocTy, TraitAssocConst, TraitMethod, TraitAssocTyImpl,
+        UnOp, UnsizingMetadata, Local, Variant, VariantId, LocalId, Layout, VariantLayout, PtrMetadata,
+        SpanData, SpecKind, TraitAssocTy, TraitAssocConst, TraitMethod, TraitAssocTyImpl,
         ItemByVal, VTableField, AssocItemNames,
         for<Id: AstVisitable> DeclRef<Id>, ItemId,
         for<T: AstVisitable> Box<T>,
@@ -90,12 +93,18 @@ pub trait AstVisitable: Any {
         std::any::type_name::<Self>()
     }
     /// Visit all occurrences of that type inside `self`, in pre-order traversal.
-    fn dyn_visit<T: AstVisitable>(&self, f: impl FnMut(&T)) {
-        let _ = self.drive(&mut DynVisitor::new_shared::<T>(f));
+    fn dyn_visit<T: AstVisitable>(&self, f: impl FnMut(&T))
+    where
+        Self: Sized,
+    {
+        let _ = VisitAst::visit(&mut DynVisitor::new_shared::<T>(f), self);
     }
     /// Visit all occurrences of that type inside `self`, in pre-order traversal.
-    fn dyn_visit_mut<T: AstVisitable>(&mut self, f: impl FnMut(&mut T)) {
-        let _ = self.drive_mut(&mut DynVisitor::new_mut::<T>(f));
+    fn dyn_visit_mut<T: AstVisitable>(&mut self, f: impl FnMut(&mut T))
+    where
+        Self: Sized,
+    {
+        let _ = VisitAstMut::visit(&mut DynVisitor::new_mut::<T>(f), self);
     }
 }
 
@@ -113,6 +122,16 @@ impl<K: AstVisitable + Hash + Eq, T: AstVisitable> AstVisitable for SeqHashMap<K
             v.visit(&mut k)?;
             v.visit(&mut x)?;
             self.insert(k, x);
+        }
+        Continue(())
+    }
+    fn drive_two<V: ZipAst>(&self, other: &Self, v: &mut V) -> ControlFlow<V::Break> {
+        if self.len() != other.len() {
+            return Break(Default::default());
+        }
+        for ((key, value), (other_key, other_value)) in self.iter().zip(other) {
+            v.visit(key, other_key)?;
+            v.visit(value, other_value)?;
         }
         Continue(())
     }
@@ -156,15 +175,15 @@ impl<K: BodyVisitable + Hash + Eq, T: BodyVisitable> BodyVisitable for SeqHashMa
         AbortKind, BinOp, BorrowKind, BuiltinAssertKind, ConstantExpr, FieldId, FieldProjKind,
         TypeDeclRef, FunDeclId, FunDeclRef, FnPtrKind, GenericArgs, GlobalDeclRef, IntegerTy, IntTy, UIntTy,
         NullOp, RefKind, ScalarValue, Span, Ty, TypeDeclId, TypeId, UnOp, VariantId,
-        TraitRef, LiteralTy, Literal, RegionId, (), String, bool,
+        TraitRef, LiteralTy, Literal, Region, RegionId, (), String, PathBuf, bool,
     ),
     // Types that we unconditionally explore.
     drive(
-        Assert, PlaceKind,
+        Assert, BorrowckStatement, PlaceKind,
         llbc_ast::ExprBody, llbc_ast::StatementKind, llbc_ast::Switch,
         ullbc_ast::BlockData, ullbc_ast::ExprBody, ullbc_ast::StatementKind,
-        ullbc_ast::TerminatorKind, ullbc_ast::SwitchTargets, CopyNonOverlapping,
-        llbc_ast::StatementId,
+        ullbc_ast::TerminatorKind, ullbc_ast::SwitchTargets,
+        llbc_ast::BlockId, llbc_ast::StatementId,
         Body, Local,
         for<T: BodyVisitable> Box<T>,
         for<T: BodyVisitable> Option<T>,
@@ -189,13 +208,19 @@ impl<K: BodyVisitable + Hash + Eq, T: BodyVisitable> BodyVisitable for SeqHashMa
 )]
 pub trait BodyVisitable: Any {
     /// Visit all occurrences of that type inside `self`, in pre-order traversal.
-    fn dyn_visit_in_body<T: BodyVisitable>(&self, f: impl FnMut(&T)) {
-        let _ = self.drive_body(&mut DynVisitor::new_shared::<T>(f));
+    fn dyn_visit_in_body<T: BodyVisitable>(&self, f: impl FnMut(&T))
+    where
+        Self: Sized,
+    {
+        let _ = VisitBody::visit(&mut DynVisitor::new_shared::<T>(f), self);
     }
 
     /// Visit all occurrences of that type inside `self`, in pre-order traversal.
-    fn dyn_visit_in_body_mut<T: BodyVisitable>(&mut self, f: impl FnMut(&mut T)) {
-        let _ = self.drive_body_mut(&mut DynVisitor::new_mut::<T>(f));
+    fn dyn_visit_in_body_mut<T: BodyVisitable>(&mut self, f: impl FnMut(&mut T))
+    where
+        Self: Sized,
+    {
+        let _ = VisitBodyMut::visit(&mut DynVisitor::new_mut::<T>(f), self);
     }
 }
 
@@ -491,6 +516,124 @@ mod wrappers {
         }
     }
 
+    /// Visitor wrapper that catches references to top-level items.
+    #[repr(transparent)]
+    pub struct VisitWithItemRef<V>(V);
+
+    impl<V> VisitWithItemRef<V> {
+        pub fn new(v: &mut V) -> &mut Self {
+            // SAFETY: `repr(transparent)`
+            unsafe { std::mem::transmute(v) }
+        }
+        pub fn inner(&mut self) -> &mut V {
+            // SAFETY: `repr(transparent)`
+            unsafe { std::mem::transmute(self) }
+        }
+    }
+
+    pub trait VisitorWithItemRef: VisitAst {
+        fn enter_item_ref(&mut self, _item_id: ItemId, _args: &GenericArgs) {}
+        fn exit_item_ref(&mut self, _item_id: ItemId, _args: &GenericArgs) {}
+        fn visit_item_ref(
+            &mut self,
+            item_id: ItemId,
+            args: &GenericArgs,
+        ) -> ControlFlow<Self::Break> {
+            self.enter_item_ref(item_id, args);
+            self.visit_inner(args)?;
+            self.exit_item_ref(item_id, args);
+            Continue(())
+        }
+    }
+    pub trait VisitorWithItemRefMut: VisitAstMut {
+        fn enter_item_ref(&mut self, _item_id: ItemId, _args: &mut GenericArgs) {}
+        fn exit_item_ref(&mut self, _item_id: ItemId, _args: &mut GenericArgs) {}
+        fn visit_item_ref(
+            &mut self,
+            item_id: ItemId,
+            args: &mut GenericArgs,
+        ) -> ControlFlow<Self::Break> {
+            self.enter_item_ref(item_id, args);
+            self.visit_inner(args)?;
+            self.exit_item_ref(item_id, args);
+            Continue(())
+        }
+    }
+
+    impl<V: Visitor> Visitor for VisitWithItemRef<V> {
+        type Break = V::Break;
+    }
+    impl<V: VisitAst + VisitorWithItemRef> VisitAst for VisitWithItemRef<V> {
+        fn visit_inner<T>(&mut self, x: &T) -> ControlFlow<Self::Break>
+        where
+            T: AstVisitable,
+        {
+            x.drive(self.inner())
+        }
+        fn visit_type_decl_ref(&mut self, x: &TypeDeclRef) -> ControlFlow<Self::Break> {
+            match x.id {
+                TypeId::Adt(id) => self.0.visit_item_ref(ItemId::Type(id), &x.generics),
+                TypeId::Tuple | TypeId::Builtin(_) => self.visit_inner(x),
+            }
+        }
+        fn visit_fun_decl_ref(&mut self, x: &FunDeclRef) -> ControlFlow<Self::Break> {
+            self.0.visit_item_ref(ItemId::Fun(x.id), &x.generics)
+        }
+        fn visit_global_decl_ref(&mut self, x: &GlobalDeclRef) -> ControlFlow<Self::Break> {
+            self.0.visit_item_ref(ItemId::Global(x.id), &x.generics)
+        }
+        fn visit_trait_decl_ref(&mut self, x: &TraitDeclRef) -> ControlFlow<Self::Break> {
+            self.0.visit_item_ref(ItemId::TraitDecl(x.id), &x.generics)
+        }
+        fn visit_trait_impl_ref(&mut self, x: &TraitImplRef) -> ControlFlow<Self::Break> {
+            self.0.visit_item_ref(ItemId::TraitImpl(x.id), &x.generics)
+        }
+        fn visit_fn_ptr(&mut self, x: &FnPtr) -> ControlFlow<Self::Break> {
+            match x.kind.as_ref() {
+                FnPtrKind::Fun(FunId::Regular(id)) => {
+                    self.0.visit_item_ref(ItemId::Fun(*id), &x.generics)
+                }
+                FnPtrKind::Fun(FunId::Builtin(_)) | FnPtrKind::Trait(..) => self.visit_inner(x),
+            }
+        }
+    }
+    impl<V: VisitAstMut + VisitorWithItemRefMut> VisitAstMut for VisitWithItemRef<V> {
+        fn visit_inner<T>(&mut self, x: &mut T) -> ControlFlow<Self::Break>
+        where
+            T: AstVisitable,
+        {
+            x.drive_mut(self.inner())
+        }
+        fn visit_type_decl_ref(&mut self, x: &mut TypeDeclRef) -> ControlFlow<Self::Break> {
+            match x.id {
+                TypeId::Adt(id) => self.0.visit_item_ref(ItemId::Type(id), &mut x.generics),
+                TypeId::Tuple | TypeId::Builtin(_) => self.visit_inner(x),
+            }
+        }
+        fn visit_fun_decl_ref(&mut self, x: &mut FunDeclRef) -> ControlFlow<Self::Break> {
+            self.0.visit_item_ref(ItemId::Fun(x.id), &mut x.generics)
+        }
+        fn visit_global_decl_ref(&mut self, x: &mut GlobalDeclRef) -> ControlFlow<Self::Break> {
+            self.0.visit_item_ref(ItemId::Global(x.id), &mut x.generics)
+        }
+        fn visit_trait_decl_ref(&mut self, x: &mut TraitDeclRef) -> ControlFlow<Self::Break> {
+            self.0
+                .visit_item_ref(ItemId::TraitDecl(x.id), &mut x.generics)
+        }
+        fn visit_trait_impl_ref(&mut self, x: &mut TraitImplRef) -> ControlFlow<Self::Break> {
+            self.0
+                .visit_item_ref(ItemId::TraitImpl(x.id), &mut x.generics)
+        }
+        fn visit_fn_ptr(&mut self, x: &mut FnPtr) -> ControlFlow<Self::Break> {
+            match x.kind.as_ref() {
+                FnPtrKind::Fun(FunId::Regular(id)) => {
+                    self.0.visit_item_ref(ItemId::Fun(*id), &mut x.generics)
+                }
+                FnPtrKind::Fun(FunId::Builtin(_)) | FnPtrKind::Trait(..) => self.visit_inner(x),
+            }
+        }
+    }
+
     /// Visitor wrapper that tracks the stack of binders seen so far. See [`VisitWithBinderDepth`] for how to use.
     #[repr(transparent)]
     pub struct VisitWithBinderStack<V>(V);
@@ -744,7 +887,7 @@ mod wrappers {
         }
     }
 
-    /// Combo impl to be able to use `VisitWithSpan` and `VisitWithBinderStack` together.
+    /// Combo impls to be able to use some wrappers together.
     impl<V: VisitorWithSpan> VisitorWithSpan for VisitWithBinderStack<V> {
         fn current_span(&mut self) -> &mut Span {
             self.0.current_span()
@@ -758,6 +901,11 @@ mod wrappers {
     impl<V: VisitorWithSpan> VisitorWithSpan for DontLeakImplDetails<V> {
         fn current_span(&mut self) -> &mut Span {
             self.0.current_span()
+        }
+    }
+    impl<V: VisitorWithBinderDepth> VisitorWithBinderDepth for VisitWithItemRef<V> {
+        fn binder_depth_mut(&mut self) -> &mut DeBruijnId {
+            self.0.binder_depth_mut()
         }
     }
 }

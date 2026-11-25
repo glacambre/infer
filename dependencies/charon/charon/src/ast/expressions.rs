@@ -1,13 +1,15 @@
 //! Implements expressions: paths, operands, rvalues, lvalues
 
 use crate::ast::*;
-use derive_generic_visitor::{Drive, DriveMut};
+use derive_generic_visitor::{Drive, DriveMut, DriveTwo};
 use macros::{EnumAsGetters, EnumIsA, EnumToGetters, VariantIndexArity, VariantName};
 use serde::{Deserialize, Serialize};
 use serde_state::{DeserializeState, SerializeState};
 use std::vec::Vec;
 
-#[derive(Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
+)]
 #[serde_state(state_implements = HashConsSerializerState)] // Avoid corecursive impls due to perfect derive
 pub struct Place {
     pub kind: PlaceKind,
@@ -26,6 +28,7 @@ pub struct Place {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Place"))]
 pub enum PlaceKind {
@@ -59,6 +62,7 @@ pub enum PlaceKind {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 pub enum ProjectionElem {
     /// Dereference a shared/mutable reference, a box, or a raw pointer.
@@ -107,6 +111,7 @@ pub enum ProjectionElem {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Proj"))]
 pub enum FieldProjKind {
@@ -128,6 +133,7 @@ pub enum FieldProjKind {
     Deserialize,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("B"))]
 pub enum BorrowKind {
@@ -168,6 +174,7 @@ pub enum BorrowKind {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::rename("Unop"))]
 pub enum UnOp {
@@ -192,6 +199,7 @@ pub enum UnOp {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::rename("Nullop"))]
 pub enum NullOp {
@@ -216,6 +224,7 @@ pub enum NullOp {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Cast"))]
 pub enum CastKind {
@@ -250,6 +259,8 @@ pub enum CastKind {
     Debug,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Clone,
     EnumIsA,
     VariantName,
@@ -257,6 +268,7 @@ pub enum CastKind {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
     Hash,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Meta"))]
@@ -303,6 +315,7 @@ pub enum OverflowMode {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::rename("Binop"))]
 #[serde_state(stateless)]
@@ -359,6 +372,7 @@ pub enum BinOp {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[serde_state(state_implements = HashConsSerializerState)] // Avoid corecursive impls due to perfect derive
 pub enum Operand {
@@ -375,6 +389,8 @@ pub enum Operand {
     Clone,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     EnumIsA,
     EnumAsGetters,
@@ -383,6 +399,7 @@ pub enum Operand {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("F"))]
 #[serde_state(stateless)]
@@ -416,6 +433,8 @@ impl From<BuiltinFunId> for FunId {
     Copy,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     Hash,
     EnumIsA,
     EnumAsGetters,
@@ -424,6 +443,7 @@ impl From<BuiltinFunId> for FunId {
     Deserialize,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 pub enum BuiltinFunId {
     /// Used instead of `alloc::boxed::Box::new` when `--treat-box-as-builtin` is set.
@@ -457,7 +477,21 @@ pub enum BuiltinFunId {
 }
 
 /// One of 8 built-in indexing operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Drive, DriveMut)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct BuiltinIndexOp {
     /// Whether this is a slice or array.
     #[drive(skip)]
@@ -473,7 +507,9 @@ pub struct BuiltinIndexOp {
 }
 
 /// Reference to a function declaration or builtin function.
-#[derive(Debug, Clone, SerializeState, DeserializeState, PartialEq, Eq, Hash, Drive, DriveMut)]
+#[derive(
+    Debug, Clone, SerializeState, DeserializeState, PartialEq, Eq, Hash, Drive, DriveMut, DriveTwo,
+)]
 pub struct MaybeBuiltinFunDeclRef {
     pub id: FunId,
     pub generics: BoxedArgs,
@@ -485,11 +521,14 @@ pub struct MaybeBuiltinFunDeclRef {
     Clone,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
     EnumAsGetters,
     SerializeState,
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
     Hash,
 )]
 pub enum FnPtrKind {
@@ -511,7 +550,20 @@ impl From<FunDeclId> for FnPtrKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, Hash)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Clone,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub struct FnPtr {
     pub kind: Box<FnPtrKind>,
     pub generics: BoxedArgs,
@@ -523,7 +575,20 @@ impl From<FunDeclRef> for FnPtr {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, Hash)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Clone,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Prov"))]
 pub enum Provenance {
     Global(GlobalDeclRef),
@@ -533,7 +598,20 @@ pub enum Provenance {
 
 /// A byte, in the MiniRust sense: it can either be uninitialized, a concrete u8 value,
 /// or part of a pointer with provenance (e.g. to a global or a function)
-#[derive(Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, Hash)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Clone,
+    Hash,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 pub enum Byte {
     /// An uninitialized byte
     Uninit,
@@ -575,9 +653,11 @@ pub enum Byte {
 /// reading the constant `a.b` is translated to `{ _1 = const a; _2 = (_1.0) }`.
 #[derive(
     Debug,
-    Hash,
     PartialEq,
     Eq,
+    PartialOrd,
+    Ord,
+    Hash,
     Clone,
     VariantName,
     EnumIsA,
@@ -586,6 +666,7 @@ pub enum Byte {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("C"))]
 pub enum ConstantExprKind {
@@ -666,7 +747,20 @@ pub enum ConstantExprKind {
     Opaque(String),
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Clone,
+    SerializeState,
+    DeserializeState,
+    Drive,
+    DriveMut,
+    DriveTwo,
+)]
 #[serde_state(state_implements = HashConsSerializerState)] // Avoid corecursive impls due to perfect derive
 pub struct ConstantExpr {
     pub kind: ConstantExprKind,
@@ -675,7 +769,9 @@ pub struct ConstantExpr {
 
 /// Used for [`Rvalue::Use`] to indicate whether the operand should be retagged (this is used
 /// for Rust's aliasing model).
-#[derive(Debug, Hash, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug, Hash, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
+)]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_suffix("Retag"))]
 pub enum WithRetag {
     No,
@@ -698,6 +794,7 @@ pub enum WithRetag {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 pub enum Rvalue {
     /// Lifts an operand as an rvalue.
@@ -796,6 +893,7 @@ pub enum Rvalue {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::variants_prefix("Aggregated"))]
 pub enum AggregateKind {

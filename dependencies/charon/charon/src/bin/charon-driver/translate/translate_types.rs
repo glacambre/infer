@@ -48,6 +48,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                 Ok(var) => Region::Var(var),
                 Err(_) => Region::Erased,
             }),
+            ReLateParam(region) => Ok(Region::Var(self.lookup_late_param_region(span, region)?)),
             ReVar(..) | RePlaceholder(..) => {
                 // Shouldn't exist outside of type inference.
                 raise_error!(
@@ -56,7 +57,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                     "Should not exist outside of type inference: {region:?}"
                 )
             }
-            ReBound(..) | ReLateParam(..) | ReError(..) => {
+            ReBound(..) | ReError(..) => {
                 raise_error!(self, span, "Unexpected region kind: {region:?}")
             }
         }
@@ -362,6 +363,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         Ok(FunSig {
             is_unsafe: sig.safety == hax::Safety::Unsafe,
             abi: Self::translate_abi(&sig.abi),
+            is_variadic: sig.c_variadic,
             inputs,
             output,
         })
@@ -817,9 +819,6 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
             trace!("variant {i}: {var_def:?}");
 
             let mut fields: IndexVec<FieldId, Field> = Default::default();
-            /* This is for sanity: check that either all the fields have names, or
-             * none of them has */
-            let mut have_names: Option<bool> = None;
             for (j, field_def) in var_def.fields.iter().enumerate() {
                 trace!("variant {i}: field {j}: {field_def:?}");
                 let field_span = self.t_ctx.translate_span(&field_def.span);
@@ -830,25 +829,17 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                 let field_attrs = self.t_ctx.translate_attr_info(&field_full_def);
 
                 // Retrieve the field name.
-                let field_name = field_def.name.map(|s| s.to_string());
-                // Sanity check
-                match &have_names {
-                    None => {
-                        have_names = match &field_name {
-                            None => Some(false),
-                            Some(_) => Some(true),
-                        }
-                    }
-                    Some(b) => {
-                        error_assert!(self, field_span, *b == field_name.is_some());
-                    }
-                };
+                let is_positional = field_def.name.is_none();
+                let field_name = field_def
+                    .name
+                    .map_or_else(|| format!("_{j}"), |name| name.to_string());
 
                 // Store the field
                 let field = Field {
                     span: field_span,
                     attr_info: field_attrs,
                     name: field_name,
+                    is_positional,
                     ty,
                 };
                 fields.push(field);

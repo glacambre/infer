@@ -125,7 +125,8 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         match target_kind {
             ClosureKind::FnOnce => {}
             ClosureKind::FnMut | ClosureKind::Fn => {
-                let rid = regions.push_with(|index| RegionParam::new(index, None));
+                let rid =
+                    regions.push_with(|index| RegionParam::new(index, None, Variance::Covariant));
                 *dref.generics.regions.iter_mut().last().unwrap() =
                     Region::Var(DeBruijnVar::new_at_zero(rid));
             }
@@ -252,10 +253,12 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             .unwrap()
             .iter()
             .cloned()
-            .map(|ty| Field {
+            .enumerate()
+            .map(|(field_id, ty)| Field {
                 span,
                 attr_info: AttrInfo::dummy_private(),
-                name: None,
+                name: format!("_{field_id}"),
+                is_positional: true,
                 ty,
             })
             .collect();
@@ -288,7 +291,8 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         let state_ty = match target_kind {
             ClosureKind::FnOnce => state_ty,
             ClosureKind::Fn | ClosureKind::FnMut => {
-                let rid = bound_regions.push_with(|index| RegionParam::new(index, None));
+                let rid = bound_regions
+                    .push_with(|index| RegionParam::new(index, None, Variance::Covariant));
                 let r = Region::Var(DeBruijnVar::new_at_zero(rid));
                 let mutability = if target_kind == ClosureKind::Fn {
                     RefKind::Shared
@@ -558,10 +562,6 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         };
         let mut timpl = self.translate_virtual_trait_impl(def_id, item_meta, vimpl)?;
 
-        if self.monomorphize() {
-            return Ok(timpl);
-        }
-
         // Construct the `call_*` method reference.
         let trait_decl_id = timpl.impl_trait.id;
         let trait_method_id = self.translate_trait_method_id(trait_decl_id, &vimpl.methods[0])?;
@@ -580,6 +580,9 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
                 fn_decl_ref,
             )
         };
+        if self.monomorphize() {
+            return Ok(timpl);
+        }
         timpl
             .methods
             .set_slot_extend(trait_method_id, call_fn_binder);

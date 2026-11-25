@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -21,7 +21,7 @@ pub trait Destruct<Self>
 }
 
 // Full name: alloc::alloc::Global
-#[lang_item("global_alloc_ty")]
+#[lang_item(GlobalAlloc)]
 pub struct Global {}
 
 // Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_glue
@@ -29,11 +29,13 @@ unsafe fn impl_Destruct_for_Box::drop_glue<'_0, T, A>(_1: &'_0 mut alloc::boxed:
 where
     TraitClause0: (T: MetaSized),
     TraitClause1: (A: Sized),
+    TypeOutlives0: T: '_0,
+    TypeOutlives1: A: '_0,
 = <opaque>
 
 // Full name: test_crate::Thing
 pub enum Thing {
-  A(alloc::boxed::Box<()>[{built_in impl MetaSized for ()}, {built_in impl Sized for Global}]),
+  A { _0: alloc::boxed::Box<()>[{built_in impl MetaSized for ()}, {built_in impl Sized for Global}] },
 }
 
 // Full name: test_crate::Thing::{impl Destruct for Thing}::drop_glue
@@ -42,12 +44,16 @@ unsafe fn impl_Destruct_for_Thing::drop_glue<'_0>(_1: &'_0 mut Thing)
     let _0: (); // return
     let _1: &'1 mut Thing; // arg #1
 
+    storage_live(_0)
     _0 = ()
     match (*_1) {
         _ => {
         },
     }
-    drop[impl_Destruct_for_Box::drop_glue<'2, (), Global>[{built_in impl MetaSized for ()}, {built_in impl Sized for Global}]] ((*_1) as variant Thing::A).0
+    drop[impl_Destruct_for_Box::drop_glue<'2, (), Global>[{built_in impl MetaSized for ()}, {built_in impl Sized for Global}]] ((*_1) as variant Thing::A)._0
+    ↳⚡ storage_dead(_1)
+        unwind_continue
+    storage_dead(_1)
     return
 }
 
@@ -63,9 +69,13 @@ fn foo(_1: Thing)
     let _0: (); // return
     let _1: Thing; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
     conditional_drop[impl_Destruct_for_Thing::drop_glue<'0>] _1
+    ↳⚡ storage_dead(_1)
+        unwind_continue
+    storage_dead(_1)
     return
 }
 

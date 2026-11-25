@@ -7,13 +7,15 @@ pub mod finish_translation {
     pub mod filter_invisible_trait_impls;
     pub mod insert_assign_return_unit;
     pub mod insert_ptr_metadata;
-    pub mod insert_storage_lives;
+    pub mod insert_storage_statements;
 }
 
 /// Passes that compute extra info to be stored in the crate.
 pub mod add_missing_info {
+    pub mod add_implied_outlives;
     pub mod add_missing_alias_clauses;
     pub mod compute_short_names;
+    pub mod link_specs;
     pub mod recover_body_comments;
     pub mod reorder_decls;
     pub mod sccs;
@@ -55,8 +57,8 @@ pub mod simplify_output {
     pub mod remove_adt_clauses;
     pub mod remove_nops;
     pub mod remove_unit_locals;
+    pub mod remove_unused_clauses;
     pub mod remove_unused_locals;
-    pub mod remove_unused_self_clause;
     pub mod simplify_constants;
     pub mod unbind_item_vars;
     pub mod update_block_indices;
@@ -89,6 +91,8 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
 
     // Item and type cleanup passes.
     ctx.run_passes([
+        // Link specification items and the items they specify in both directions.
+        global(&add_missing_info::link_specs::Transform),
         // `--duplicate-defaulted-methods`: copy default method bodies into impls that use them.
         global(&simplify_output::duplicate_defaulted_methods::Transform),
         // Compute short names. We do it early to make pretty-printed output more legible in traces.
@@ -103,6 +107,8 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
         // Type aliases may use associated types without declaring the corresponding trait
         // such missing trait clauses.
         global(&add_missing_info::add_missing_alias_clauses::Transform),
+        // Make explicit the outlives predicates implied by item signatures.
+        global(&add_missing_info::add_implied_outlives::Transform),
     ]);
 
     // Body cleanup passes on the ullbc.
@@ -115,8 +121,8 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
         // contains ⊥ upon returning. For this reason, when the function has return type unit, we
         // insert an extra assignment just before returning.
         CowBox::Borrowed(&finish_translation::insert_assign_return_unit::Transform),
-        // Insert `StorageLive` for locals that don't have one (that's allowed in MIR).
-        CowBox::Borrowed(&finish_translation::insert_storage_lives::Transform),
+        // Insert storage markers for locals that don't have them (that's allowed in MIR).
+        CowBox::Borrowed(&finish_translation::insert_storage_statements::Transform),
         // Transform Drops into Calls to drop_glue.
         CowBox::Borrowed(&normalize::desugar_drops::Transform),
         // Whenever we reference a trait method on a known type, refer to the method `FunDecl`
@@ -211,12 +217,14 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
     }
     // Cleanup passes useful for both llbc and ullbc.
     ctx.run_passes([
+        // Body passes may introduce fresh locals; make their storage markers explicit.
+        mixed_body(&finish_translation::insert_storage_statements::Transform),
         // Change trait associated types to be type parameters instead. See the module for details.
         // This also normalizes any use of an associated type that we can resolve.
         global(&normalize::expand_associated_types::Transform),
         // Remove the explicit `Self: Trait` clause of methods/assoc const declaration items if
         // they're not used. This simplifies the graph of dependencies between definitions.
-        global(&simplify_output::remove_unused_self_clause::Transform),
+        global(&simplify_output::remove_unused_clauses::Transform),
         // `--remove-adt-clauses`: Remove all trait clauses from type declarations.
         global(&simplify_output::remove_adt_clauses::Transform),
         // Remove the locals which are never used.
@@ -237,6 +245,10 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
         // - group the mutually recursive definitions
         // This is done last to account for the final item graph, not the initial one.
         global(&add_missing_info::reorder_decls::Transform),
+        // Check that types are still consistent after the transformation passes.
+        global(&typecheck_and_unify::Check::PostTransformation),
+        // Use `DeBruijnVar::Free` for the variables bound in item signatures.
+        mixed_body(&simplify_output::unbind_item_vars::Check),
     ]);
 
     if options.ullbc {
@@ -251,15 +263,6 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
             "# Final LLBC before serialization".to_string(),
         )));
     }
-
-    // Run the final passes after pretty-printing so that we get some output even if check_generics
-    // fails.
-    ctx.run_passes([
-        // Check that types are still consistent after the transformation passes.
-        global(&typecheck_and_unify::Check::PostTransformation),
-        // Use `DeBruijnVar::Free` for the variables bound in item signatures.
-        mixed_body(&simplify_output::unbind_item_vars::Check),
-    ]);
 }
 
 pub enum CowBox<T: ?Sized + 'static> {

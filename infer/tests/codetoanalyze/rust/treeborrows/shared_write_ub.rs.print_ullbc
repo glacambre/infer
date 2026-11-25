@@ -1,23 +1,25 @@
 # Final ULLBC before serialization:
 
 // Full name: shared_write_ub::f
-fn f<'_0>(a_1: &'_0 i32)
+fn f<'_0>(a: &'_0 i32)
 {
     let _0: (); // return
-    let a_1: &'1 i32; // arg #1
-    let p_2: *mut i32; // local
+    let a: &'1 i32; // arg #1
+    let p: *mut i32; // local
     let _3: *const i32; // anonymous local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(p_2);
+        storage_live(p);
         storage_live(_3);
-        _3 = &raw const (*a_1);
-        p_2 = cast<*const i32, *mut i32>(move _3);
+        _3 = &raw const (*a);
+        p = cast<*const i32, *mut i32>(move _3);
         storage_dead(_3);
-        (*p_2) = const 1i32;
+        (*p) = const 1i32;
         _0 = ();
-        storage_dead(p_2);
+        storage_dead(p);
+        storage_dead(a);
         return;
     }
 }
@@ -26,19 +28,20 @@ fn f<'_0>(a_1: &'_0 i32)
 fn main()
 {
     let _0: (); // return
-    let x_1: i32; // local
+    let x: i32; // local
     let _2: (); // anonymous local
     let _3: &'1 i32; // anonymous local
     let _4: &'2 i32; // anonymous local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(x_1);
-        x_1 = const 0i32;
+        storage_live(x);
+        x = const 0i32;
         storage_live(_2);
         storage_live(_3);
         storage_live(_4);
-        _4 = &x_1;
+        _4 = &x;
         _3 = &(*_4);
         _2 = f<'4>(move _3) -> bb2 (unwind: bb1);
     }
@@ -52,7 +55,7 @@ fn main()
         storage_dead(_4);
         storage_dead(_2);
         _0 = ();
-        storage_dead(x_1);
+        storage_dead(x);
         return;
     }
 }

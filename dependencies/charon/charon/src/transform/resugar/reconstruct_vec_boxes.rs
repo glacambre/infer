@@ -329,8 +329,12 @@ impl UllbcPass for Transform {
                 // check uninit_box: Box<MaybeUninit<_>>
                 let uninit_box = call.dest.clone();
                 let maybe_uninit_array_ty = box_inner(uninit_box.ty())?;
-                let mu_decl = &ctx.translated.type_decls[maybe_uninit_array_ty.as_adt_id()?];
-                if mu_decl.item_meta.lang_item.as_deref() != Some("maybe_uninit") {
+                let mu_decl = &ctx
+                    .translated
+                    .type_decls
+                    .get(maybe_uninit_array_ty.as_adt_id()?)?;
+                if mu_decl.item_meta.lang_item.as_ref() != Some(&from_rustc::LangItem::MaybeUninit)
+                {
                     return None;
                 };
                 let uninit_box_l = uninit_box.local_id()?;
@@ -406,10 +410,12 @@ impl UllbcPass for Transform {
                 body.body[rw.new_uninit_bid].terminator.kind = TerminatorKind::Goto {
                     target: rw.new_uninit_target,
                 };
+                let mut box_new_generics = rw.box_array_generics.clone();
+                box_new_generics.types.pop(); // pop the allocator param
                 (
                     FnPtr::new(
                         FnPtrKind::Fun(FunId::Builtin(BuiltinFunId::BoxNew)),
-                        rw.box_array_generics,
+                        box_new_generics,
                     ),
                     vec![Operand::Move(array_local.clone())],
                 )

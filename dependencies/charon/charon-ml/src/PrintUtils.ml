@@ -8,7 +8,7 @@ let option_to_string (to_string : 'a -> string) (x : 'a option) : string =
   | None -> "None"
 
 let block_id_to_string (id : UllbcAst.BlockId.id) : string =
-  "block@" ^ UllbcAst.BlockId.to_string id
+  "bb" ^ UllbcAst.BlockId.to_string id
 
 (** The formatting environment can be incomplete: if some information is missing
     (for instance we can't find the type variable for a given index) we print
@@ -19,7 +19,8 @@ type fmt_env = {
       (** We have a stack of generic parameters, because we can dive into
           binders (for instance because of the arrow type). *)
   locals : (local_id * string option) list;
-      (** The local variables don't need to be ordered (same as the generics) *)
+      (** The local variable display names don't need to be ordered (same as the
+          generics). *)
 }
 
 let of_crate (crate : crate) : fmt_env = { crate; generics = []; locals = [] }

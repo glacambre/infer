@@ -22,25 +22,26 @@ and statement_kind =
   | SetDiscriminant of place * variant_id
       (** A call. For now, we don't support dynamic calls (i.e. to a function
           pointer in memory). *)
-  | CopyNonOverlapping of copy_non_overlapping
-      (** Equivalent to std::intrinsics::copy_nonoverlapping; this is not
-          modelled as a function call as it cannot diverge *)
   | StorageLive of local_id
       (** Indicates that this local should be allocated; if it is already
-          allocated, this frees the local and re-allocates it. The return value
-          and arguments do not receive a [StorageLive]. We ensure in the
-          micro-pass [insert_storage_lives] that all other locals have a
-          [StorageLive] associated with them. *)
+          allocated, this frees the local and re-allocates it. The arguments do
+          not receive a [StorageLive]. We ensure in the micro-pass
+          [insert_storage_statements] that all other locals have a [StorageLive]
+          associated with them. *)
   | StorageDead of local_id
       (** Indicates that this local should be deallocated; if it is already
           deallocated, this is a no-op. A local may not have a [StorageDead] in
           the function's body, in which case it is implicitly deallocated at the
-          end of the function. *)
+          end of the function. The return local does not receive a
+          [StorageDead]. We ensure in the micro-pass [insert_storage_statements]
+          that all other locals have a [StorageDead] before function exits. *)
   | PlaceMention of place
       (** A place is mentioned, but not accessed. The place itself must still be
           valid though, so this statement is not a no-op: it can trigger UB if
           the place's projections are not valid (e.g. because they go out of
           bounds). *)
+  | Borrowck of borrowck_statement
+      (** Statements that only affect borrow-checking. *)
   | Assert of assertion * abort_kind
       (** A non-diverging runtime check for a condition. This can be either:
           - Emitted for inlined "assumes" (which cause UB on failure)
@@ -114,7 +115,7 @@ and terminator_kind =
           - [on_unwind] *)
   | Abort of abort_kind  (** Handles panics and impossible cases. *)
   | Return
-  | UnwindResume
+  | UnwindResume  (** Unwind out of the current function into its caller. *)
 [@@deriving
   show,
   eq,

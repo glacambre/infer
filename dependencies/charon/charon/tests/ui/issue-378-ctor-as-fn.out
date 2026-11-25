@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -21,13 +21,14 @@ pub trait Destruct<Self>
 }
 
 // Full name: core::option::Option
-#[lang_item("Option")]
+#[lang_item(Option)]
+#[diagnostic_item("Option")]
 pub enum Option<T>
 where
     TraitClause0: (T: Sized),
 {
   None,
-  Some(T),
+  Some { _0: T },
 }
 
 // Full name: core::option::Option::Some
@@ -37,7 +38,7 @@ where
 = <opaque>
 
 // Full name: alloc::string::String
-#[lang_item("String")]
+#[lang_item(String)]
 pub opaque type String
 
 // Full name: alloc::string::String::{impl Destruct for String}::drop_glue
@@ -45,7 +46,7 @@ unsafe fn impl_Destruct_for_String::drop_glue<'_0>(_1: &'_0 mut String)
 = <opaque>
 
 // Full name: alloc::string::{String}::new
-#[lang_item("string_new")]
+#[diagnostic_item("string_new")]
 pub fn new() -> String
 = <opaque>
 
@@ -54,6 +55,7 @@ fn F() -> fn(u8) -> Option<u8>[{built_in impl Sized for u8}]
 {
     let _0: fn(u8) -> Option<u8>[{built_in impl Sized for u8}]; // return
 
+    storage_live(_0)
     _0 = cast<Some<u8>[{built_in impl Sized for u8}], fn(u8) -> Option<u8>[{built_in impl Sized for u8}]>(const Some<u8>[{built_in impl Sized for u8}])
     return
 }
@@ -63,8 +65,8 @@ static F: fn(u8) -> Option<u8>[{built_in impl Sized for u8}] = F()
 
 // Full name: test_crate::Foo
 struct Foo {
-  u32,
-  String,
+  _0: u32,
+  _1: String,
 }
 
 // Full name: test_crate::Foo::{impl Destruct for Foo}::drop_glue
@@ -73,8 +75,12 @@ unsafe fn impl_Destruct_for_Foo::drop_glue<'_0>(_1: &'_0 mut Foo)
     let _0: (); // return
     let _1: &'1 mut Foo; // arg #1
 
+    storage_live(_0)
     _0 = ()
-    drop[impl_Destruct_for_String::drop_glue<'2>] ((*_1)).1
+    drop[impl_Destruct_for_String::drop_glue<'2>] (*_1)._1
+    ↳⚡ storage_dead(_1)
+        unwind_continue
+    storage_dead(_1)
     return
 }
 
@@ -91,7 +97,10 @@ fn Foo(_1: u32, _2: String) -> Foo
     let _1: u32; // arg #1
     let _2: String; // arg #2
 
-    _0 = Foo { 0: move _1, 1: move _2 }
+    storage_live(_0)
+    _0 = Foo { _0: move _1, _1: move _2 }
+    storage_dead(_2)
+    storage_dead(_1)
     return
 }
 
@@ -101,7 +110,7 @@ where
     TraitClause0: (T: Sized),
     TypeOutlives0: T: 'a,
 {
-  Variant(&'a T),
+  Variant { _0: &'a T },
 }
 
 // Full name: test_crate::Bar::Variant
@@ -113,7 +122,9 @@ where
     let _0: Bar<'a, T>[TraitClause0]; // return
     let _1: &'a T; // arg #1
 
-    _0 = Bar::Variant { 0: move _1 }
+    storage_live(_0)
+    _0 = Bar::Variant { _0: move _1 }
+    storage_dead(_1)
     return
 }
 
@@ -142,14 +153,18 @@ fn main()
     let _19: &'15 i32; // anonymous local
     let _20: i32; // anonymous local
 
+    storage_live(_0)
     storage_live(_17)
     _0 = ()
     storage_live(f_1)
     f_1 = const Some<u8>[{built_in impl Sized for u8}]
+    fake_read(f_1)
     storage_live(_2)
     storage_live(_3)
     _3 = copy f_1
     _2 = Some<u8>[{built_in impl Sized for u8}](const 42u8)
+    ↳⚡ storage_dead(_17)
+        unwind_continue
     storage_dead(_3)
     storage_dead(_2)
     storage_live(f_4)
@@ -157,23 +172,40 @@ fn main()
     _5 = copy f_1
     f_4 = cast<Some<u8>[{built_in impl Sized for u8}], fn(u8) -> Option<u8>[{built_in impl Sized for u8}]>(move _5)
     storage_dead(_5)
+    fake_read(f_4)
+    set_type(typeof(f_4) == fn(u8) -> Option<u8>[{built_in impl Sized for u8}])
     storage_live(_6)
     storage_live(_7)
     _7 = copy f_4
     _6 = (move _7)(const 42u8)
+    ↳⚡ storage_dead(_17)
+        unwind_continue
     storage_dead(_7)
     storage_dead(_6)
     storage_live(f_8)
     f_8 = const Foo
+    fake_read(f_8)
     storage_live(_9)
     storage_live(_10)
     _10 = copy f_8
     storage_live(_11)
     _11 = new()
+    ↳⚡ storage_dead(_17)
+        unwind_continue
     _9 = Foo(const 42u32, move _11)
+    ↳⚡ conditional_drop[impl_Destruct_for_String::drop_glue<'9>] _11
+        ↳⚡ storage_dead(_17)
+            storage_dead(_20)
+            storage_dead(_19)
+            storage_dead(_18)
+            unwind_terminate
+        storage_dead(_17)
+        unwind_continue
     storage_dead(_11)
     storage_dead(_10)
     conditional_drop[impl_Destruct_for_Foo::drop_glue<'10>] _9
+    ↳⚡ storage_dead(_17)
+        unwind_continue
     storage_live(_18)
     storage_live(_19)
     storage_live(_20)
@@ -183,6 +215,7 @@ fn main()
     storage_dead(_9)
     storage_live(f_12)
     f_12 = const Variant<'12, i32>[{built_in impl Sized for i32}]
+    fake_read(f_12)
     storage_live(_13)
     storage_live(_14)
     _14 = copy f_12
@@ -192,6 +225,8 @@ fn main()
     _16 = &(*_17)
     _15 = &(*_16)
     _13 = Variant<'14, i32>[{built_in impl Sized for i32}](move _15)
+    ↳⚡ storage_dead(_17)
+        unwind_continue
     storage_dead(_15)
     storage_dead(_14)
     storage_dead(_16)
@@ -201,6 +236,10 @@ fn main()
     storage_dead(f_8)
     storage_dead(f_4)
     storage_dead(f_1)
+    storage_dead(_17)
+    storage_dead(_20)
+    storage_dead(_19)
+    storage_dead(_18)
     return
 }
 

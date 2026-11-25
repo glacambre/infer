@@ -8,6 +8,7 @@ use std::collections::HashSet;
 
 use derive_generic_visitor::*;
 
+use crate::ast::ullbc_ast_utils::StmtLoc;
 use crate::ast::*;
 use crate::ids::IndexVec;
 use crate::transform::TransformCtx;
@@ -143,6 +144,24 @@ fn equiv_op(op_l: &Operand, op_r: &Operand) -> bool {
     }
 }
 
+/// A shift overflow check whose shift operation is not in the same block: rustc evaluates the
+/// shift operands (which is when it emits the overflow check) before computing the destination
+/// place, so when that computation involves a function call (e.g. `out[i] = x >> y` through an
+/// overloaded `IndexMut`), the check ends up separated from the shift by the call terminator.
+/// See issue #1041. These asserts are only ever emitted by the compiler, so instead of following
+/// the control flow we record the check and find the matching shift over the whole body in
+/// [resolve_pending_shift_check].
+struct PendingShiftCheck {
+    /// The block containing the check.
+    block: BlockId,
+    /// The checked shift amount; used to find the shift.
+    amount: Operand,
+    /// The comparison result asserted by the check. Identifies the check's statements to remove.
+    cond_local: LocalId,
+    /// The `y as uN` cast temporary, when the amount is cast before the comparison; also removed.
+    cast_local: Option<LocalId>,
+}
+
 /// Rustc inserts dynamic checks during MIR lowering. They all end in an `Assert` statement (and
 /// this is the only use of this statement).
 fn remove_dynamic_checks(
@@ -151,7 +170,14 @@ fn remove_dynamic_checks(
     block_id: BlockId,
     locals: &mut Locals,
     statements: &mut [Statement],
+    pending_shift_checks: &mut Vec<PendingShiftCheck>,
 ) {
+    // Whether this local was used in another block
+    let used_outside_block = |local: LocalId| {
+        uses.iter_enumerated()
+            .any(|(bid, used)| bid != block_id && used.contains(&local))
+    };
+
     // We return the statements we want to keep, which must be a prefix of `block.statements`.
     let statements_to_keep = match statements {
         // Bounds checks for slices. They look like:
@@ -387,6 +413,16 @@ fn remove_dynamic_checks(
             if found {
                 rest
             } else {
+                // The shift is not in this block; it may live in a later one (see
+                // [PendingShiftCheck]). Record it and resolve it over the whole body afterwards.
+                if let Some(cond_local) = has_overflow.as_local() {
+                    pending_shift_checks.push(PendingShiftCheck {
+                        block: block_id,
+                        amount: y_op.clone(),
+                        cond_local,
+                        cast_local: Some(cast_local),
+                    });
+                }
                 return;
             }
         }
@@ -419,7 +455,7 @@ fn remove_dynamic_checks(
                                 cond: Operand::Move(cond),
                                 expected: true,
                                 check_kind:
-                                    Some(
+                                    check_kind @ Some(
                                         BuiltinAssertKind::Overflow(..)
                                         | BuiltinAssertKind::BoundsCheck { .. },
                                     ),
@@ -450,6 +486,18 @@ fn remove_dynamic_checks(
             if found {
                 rest
             } else {
+                // The shift may be in a later block (see [PendingShiftCheck]). This only applies
+                // to overflow checks: a bounds check never guards a shift.
+                if matches!(check_kind, Some(BuiltinAssertKind::Overflow(..)))
+                    && let Some(cond_local) = has_overflow.as_local()
+                {
+                    pending_shift_checks.push(PendingShiftCheck {
+                        block: block_id,
+                        amount: y_op.clone(),
+                        cond_local,
+                        cast_local: None,
+                    });
+                }
                 return;
             }
         }
@@ -463,7 +511,7 @@ fn remove_dynamic_checks(
         // ```
         // We replace that with:
         // ```text
-        // z := x + y;
+        // z := x panic.+ y;
         // ```
         //
         // But sometimes, because of constant promotion, we end up with a lone checked operation
@@ -482,7 +530,9 @@ fn remove_dynamic_checks(
                 ..
             },
             rest @ ..,
-        ] if let Some(tuple_local_id) = tuple.as_local() => {
+        ] if let Some(tuple_local_id) = tuple.as_local()
+            && !used_outside_block(tuple_local_id) =>
+        {
             // Check if the result boolean is used in any other way than just getting the integer
             // result.
             let mut uses_of_tuple = 0;
@@ -580,14 +630,106 @@ fn remove_dynamic_checks(
         if let StatementKind::Assign(place, _) = &statements[i].kind
             && let Some(local) = place.as_local()
             && let mut statements_to_keep = statements[removed_len..].as_ref().iter()
-            && let mut other_blocks = uses.iter_enumerated().filter(|(bid, _)| *bid != block_id)
-            && (other_blocks.any(|(_, used)| used.contains(&local))
-                || statements_to_keep.any(|st| uses_local(st, local)))
+            && (used_outside_block(local) || statements_to_keep.any(|st| uses_local(st, local)))
         {
             continue;
         };
         statements[i].kind = StatementKind::Nop;
     }
+}
+
+/// Resolve a [PendingShiftCheck] whose shift landed in a different block. We remove the check and
+/// compute the shift early, promoted to panic-on-overflow, into a fresh local placed where the
+/// check used to be; the fresh local then carries the result to the original destination.
+///
+/// This is correct because rustc has already evaluated both shift operands by the time control
+/// reaches the check: the only effects of the shift are that evaluation and the panic-on-overflow,
+/// and the overflow check already performs both at that point. Storing the result in a fresh local
+/// lets us keep the write to the (not-yet-computed) destination place at the original shift site.
+fn resolve_pending_shift_check(body: &mut ExprBody, check: PendingShiftCheck) {
+    let PendingShiftCheck {
+        block,
+        amount,
+        cond_local,
+        cast_local,
+    } = check;
+
+    // Locate the assert we will repurpose to hold the early, promoted shift. Pairing it with the
+    // shift below (via `zip`) means we bail before mutating anything if either is unexpectedly
+    // absent, so the shift is never rewired to a fresh local we never assigned.
+    let assert_pos = body.body[block].statements.iter().position(|stmt| {
+        matches!(
+            &stmt.kind,
+            StatementKind::Assert {
+                assert: Assert {
+                    cond: Operand::Move(cond),
+                    ..
+                },
+                ..
+            } if cond.as_local() == Some(cond_local)
+        )
+    });
+
+    // rustc only emits these asserts for its own shifts, so we don't follow the control flow: we
+    // look for the (still-wrapping) shift by its amount anywhere in the body.
+    let Some(((shift_loc, dest, lhs, rhs, panic_binop, ty), assert_pos)) = body
+        .body
+        .iter_enumerated()
+        .find_map(|(sb, block_data)| {
+            block_data
+                .statements
+                .iter()
+                .enumerate()
+                .find_map(|(i, stmt)| {
+                    if let StatementKind::Assign(dest, Rvalue::BinaryOp(binop, lhs, rhs)) =
+                        &stmt.kind
+                        && matches!(
+                            binop,
+                            BinOp::Shl(OverflowMode::Wrap) | BinOp::Shr(OverflowMode::Wrap)
+                        )
+                        && equiv_op(rhs, &amount)
+                    {
+                        Some((
+                            StmtLoc::new(sb, i),
+                            dest.clone(),
+                            lhs.clone(),
+                            rhs.clone(),
+                            binop.with_overflow(OverflowMode::Panic),
+                            dest.ty.clone(),
+                        ))
+                    } else {
+                        None
+                    }
+                })
+        })
+        .zip(assert_pos)
+    else {
+        return;
+    };
+
+    // Every mutation below now happens together, so the fresh local is always assigned and used.
+    let fresh = body.locals.new_var(None, ty);
+
+    // Drop the check's comparison and optional cast; they are dead once the assert is gone.
+    body.body[block].statements.iter_mut().for_each(|stmt| {
+        let is_check_temp = if let StatementKind::Assign(place, _) = &stmt.kind {
+            let local = place.as_local();
+            local == Some(cond_local) || cast_local.is_some_and(|c| local == Some(c))
+        } else {
+            false
+        };
+        if is_check_temp {
+            stmt.kind = StatementKind::Nop;
+        }
+    });
+
+    // Compute the shift early, promoted to panic-on-overflow, where the check used to be.
+    body[StmtLoc::new(block, assert_pos)].kind =
+        StatementKind::Assign(fresh.clone(), Rvalue::BinaryOp(panic_binop, lhs, rhs));
+
+    // Forward the result at the original shift site.
+    body[shift_loc].kind =
+        StatementKind::Assign(dest, Rvalue::Use(Operand::Move(fresh), WithRetag::No));
 }
 
 pub struct Transform;
@@ -598,9 +740,14 @@ impl UllbcPass for Transform {
 
     fn transform_body(&self, ctx: &mut TransformCtx, b: &mut ExprBody) {
         let local_uses: LocalUses = compute_uses(b);
+        let mut pending_shift_checks = Vec::new();
         b.transform_sequences_fwd(|id, locals, seq| {
-            remove_dynamic_checks(ctx, &local_uses, id, locals, seq);
+            remove_dynamic_checks(ctx, &local_uses, id, locals, seq, &mut pending_shift_checks);
             Vec::new()
         });
+        // Resolve the checks whose shift lives in a later block (see [PendingShiftCheck]).
+        pending_shift_checks
+            .into_iter()
+            .for_each(|check| resolve_pending_shift_check(b, check));
     }
 }

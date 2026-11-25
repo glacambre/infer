@@ -191,7 +191,7 @@ impl<'pm, 'ctx> VisitAstMut for MutabilityShapeBuilder<'pm, 'ctx> {
         if !self.pm.is_infected(ty) {
             self.replace_with_fresh_var(
                 ty,
-                |id| TypeParam::new(id, format!("T{id}")),
+                |id| TypeParam::new(id, format!("T{id}"), Variance::Unknown),
                 |v| v.into(),
             );
         }
@@ -238,7 +238,11 @@ impl<'pm, 'ctx> VisitAstMut for MutabilityShapeBuilder<'pm, 'ctx> {
         }
     }
     fn enter_region(&mut self, r: &mut Region) {
-        self.replace_with_fresh_var(r, |id| RegionParam::new(id, None), |v| v.into());
+        self.replace_with_fresh_var(
+            r,
+            |id| RegionParam::new(id, None, Variance::Unknown),
+            |v| v.into(),
+        );
     }
     // TODO: we're missing type info for this
     // fn enter_const_generic(&mut self, cg: &mut ConstGeneric) {
@@ -559,7 +563,7 @@ impl TransformPass for Transform {
             // partially-monomorphized types.
             visitor.process_item(&mut decl.as_mut());
             // Put the item back.
-            visitor.ctx.translated.set_item_slot(id, decl);
+            visitor.ctx.translated.put_item_back(id, decl);
         }
     }
 }

@@ -381,15 +381,15 @@ let%expect_test "box" =
           store &var_0 <- null:void
           n1:*int = load &b_1
           n2 = __sil_free(n1)
-          jmp node_3
-          .handlers node_4
+          jmp node_4
+          .handlers node_3
 
       #node_3:
-          n3:void = load &var_0
-          ret n3
+          throw "UnwindResume"
 
       #node_4:
-          throw "UnwindResume"
+          n3:void = load &var_0
+          ret n3
 
     }
 
@@ -620,15 +620,15 @@ fn main() {
           n2:.rust_mut = "mut" .rust_pointer = "reference" **int = load &drop_arg_2
           n3 = __sil_boxdrop(n2)
           store &drop_ret_3 <- n3:void
-          jmp node_3
-          .handlers node_4
+          jmp node_4
+          .handlers node_3
 
       #node_3:
-          n4:void = load &var_0
-          ret n4
+          throw "UnwindResume"
 
       #node_4:
-          throw "UnwindResume"
+          n4:void = load &var_0
+          ret n4
 
     }
 

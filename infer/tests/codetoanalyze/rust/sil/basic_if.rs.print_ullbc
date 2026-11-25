@@ -4,33 +4,32 @@
 fn main()
 {
     let _0: (); // return
-    let b_1: bool; // local
+    let b: bool; // local
     let _2: bool; // anonymous local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(b_1);
-        b_1 = const true;
+        storage_live(b);
+        b = const true;
         storage_live(_2);
-        _2 = copy b_1;
+        _2 = copy b;
         if move _2 -> bb1 else -> bb2;
     }
 
     bb1: {
-        b_1 = const false;
+        b = const false;
         _0 = ();
-        goto bb3;
+        storage_dead(_2);
+        storage_dead(b);
+        return;
     }
 
     bb2: {
-        b_1 = const true;
+        b = const true;
         _0 = ();
-        goto bb3;
-    }
-
-    bb3: {
         storage_dead(_2);
-        storage_dead(b_1);
+        storage_dead(b);
         return;
     }
 }

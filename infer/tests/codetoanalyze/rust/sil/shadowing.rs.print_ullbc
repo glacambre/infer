@@ -8,6 +8,7 @@ fn main()
     let x_2: i32; // local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
         storage_live(x_1);
         x_1 = const 1i32;

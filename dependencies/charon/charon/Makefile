@@ -10,9 +10,15 @@ format:
 	cargo fmt
 
 .PHONY: test
-test:
-	$(MAKE) test
+test: test-noclippy
 	$(MAKE) clippy
+
+# Generate some of the AST code automatically from the rust definitions.
+.PHONY: generate-asts
+generate-asts:
+	cargo build --release && cargo run --release --bin generate-asts
+	$(MAKE) format
+	cd ../charon-ml && $(MAKE) format 2> /dev/null
 
 .PHONY: test-noclippy
 test-noclippy:
@@ -24,7 +30,7 @@ clippy:
 
 .PHONY: test-popular-crates
 test-popular-crates:
-	cargo test --release --features popular-crates-test --test popular-crates -- --test-threads 8
+	cargo test --release --features popular-crates-test --test popular-crates -- --test-threads 4
 
 # Build the doc.
 # For some reason, I don't manage to build all the packages in one command.

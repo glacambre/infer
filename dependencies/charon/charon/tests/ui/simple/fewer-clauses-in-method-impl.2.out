@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -25,6 +25,7 @@ fn method()
 {
     let _0: (); // return
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
     return
@@ -42,8 +43,10 @@ pub fn main()
 {
     let _0: (); // return
 
+    storage_live(_0)
     _0 = ()
     _0 = method()
+    ↳⚡ unwind_continue
     return
 }
 

@@ -3,11 +3,11 @@
 opaque type core::marker::MetaSized::{vtable}
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -15,7 +15,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -23,7 +23,7 @@ pub trait Destruct<Self>
 }
 
 // Full name: core::marker::Tuple
-#[lang_item("tuple_trait")]
+#[lang_item(Tuple)]
 pub trait Tuple<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -35,7 +35,7 @@ opaque type core::ops::function::Fn::{vtable}
 opaque type core::ops::function::FnOnce::{vtable}
 
 // Full name: core::ops::function::FnOnce
-#[lang_item("fn_once")]
+#[lang_item(FnOnce)]
 pub trait FnOnce<Self, Args>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -47,7 +47,7 @@ pub trait FnOnce<Self, Args>
 opaque type core::ops::function::FnMut::{vtable}
 
 // Full name: core::ops::function::FnMut
-#[lang_item("fn_mut")]
+#[lang_item(FnMut)]
 pub trait FnMut<Self, Args>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -58,7 +58,7 @@ pub trait FnMut<Self, Args>
 }
 
 // Full name: core::ops::function::Fn
-#[lang_item("fn")]
+#[lang_item(Fn)]
 pub trait Fn<Self, Args>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -77,7 +77,9 @@ unsafe fn drop_glue::<()><'_0>(_1: &'_0 mut closure::<()>)
     let _0: (); // return
     let _1: &'1 mut closure::<()>; // arg #1
 
+    storage_live(_0)
     _0 = ()
+    storage_dead(_1)
     return
 }
 
@@ -106,37 +108,62 @@ fn call_once::<()>(_1: closure::<()>, _2: ((),))
     let _2: ((),); // arg #2
     let _3: &'1 mut closure::<()>; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
     _0 = ()
     _3 = &mut _1
     _0 = {impl FnMut<((),)> for closure::<()>}::call_mut<'2>(move _3, move _2)
+    ↳⚡ drop[drop_glue::<()><'3>] _1
+        ↳⚡ storage_dead(_3)
+            storage_dead(_2)
+            storage_dead(_1)
+            unwind_terminate
+        storage_dead(_3)
+        storage_dead(_2)
+        storage_dead(_1)
+        unwind_continue
     drop[drop_glue::<()><'4>] _1
+    ↳⚡ storage_dead(_3)
+        storage_dead(_2)
+        storage_dead(_1)
+        unwind_continue
+    storage_dead(_3)
+    storage_dead(_2)
+    storage_dead(_1)
     return
 }
 
 // Full name: test_crate::foo::{const}::closure::as_fn::<()>
-fn as_fn::<()>(arg1_1: ())
+fn as_fn::<()>(arg1: ())
 {
     let _0: (); // return
-    let arg1_1: (); // arg #1
-    let args_2: ((),); // local
-    let state_3: closure::<()>; // local
+    let arg1: (); // arg #1
+    let args: ((),); // local
+    let state: closure::<()>; // local
 
+    storage_live(_0)
     _0 = ()
-    storage_live(args_2)
-    storage_live(state_3)
-    args_2 = (move arg1_1,)
-    state_3 = closure::<()> {  }
-    _0 = call_once::<()>(move state_3, move args_2)
+    storage_live(args)
+    storage_live(state)
+    args = (move arg1,)
+    state = closure::<()> {  }
+    _0 = call_once::<()>(move state, move args)
+    ↳⚡ storage_dead(state)
+        storage_dead(args)
+        storage_dead(arg1)
+        unwind_continue
+    storage_dead(state)
+    storage_dead(args)
+    storage_dead(arg1)
     return
 }
 
 // Full name: test_crate::foo::<()>
-fn foo::<()>(x_1: ())
+fn foo::<()>(x: ())
 {
     let _0: (); // return
-    let x_1: (); // arg #1
-    let f_2: fn(()); // local
+    let x: (); // arg #1
+    let f: fn(()); // local
     let _3: fn(()); // anonymous local
     let _4: (); // anonymous local
     let _5: fn(()); // anonymous local
@@ -150,17 +177,25 @@ fn foo::<()>(x_1: ())
     _6 = cast<as_fn::<()>, fn(())>(const as_fn::<()>)
     storage_dead(_7)
     _5 = move _6
+    storage_live(_0)
     _0 = ()
-    storage_live(f_2)
-    f_2 = move _5
+    storage_live(f)
+    f = move _5
+    fake_read(f)
+    set_type(typeof(f) == fn(()))
     storage_live(_3)
-    _3 = copy f_2
+    _3 = copy f
     storage_live(_4)
     _4 = ()
     _0 = (move _3)(move _4)
+    ↳⚡ storage_dead(x)
+        unwind_continue
     storage_dead(_4)
     storage_dead(_3)
-    storage_dead(f_2)
+    storage_dead(f)
+    storage_dead(x)
+    storage_dead(_6)
+    storage_dead(_5)
     return
 }
 
@@ -179,6 +214,48 @@ impl Destruct for closure::<()> {
     non-dyn-compatible
 }
 
+// Full name: test_crate::foo::{const}::{impl Fn<((),)> for closure::<()>}::call::<()>
+fn call::<()><'_0>(_1: &'_0 closure::<()>, tupled_args: ((),))
+{
+    let _0: (); // return
+    let _1: &'1 closure::<()>; // arg #1
+    let tupled_args: ((),); // arg #2
+    let x: (); // local
+
+    storage_live(_0)
+    storage_live(x)
+    _0 = ()
+    x = move tupled_args.0
+    _0 = ()
+    storage_dead(x)
+    storage_dead(tupled_args)
+    storage_dead(_1)
+    return
+}
+
+// Full name: test_crate::foo::{const}::{impl FnMut<((),)> for closure::<()>}::call_mut::<()>
+fn call_mut::<()><'_0>(state: &'_0 mut closure::<()>, args: ((),))
+{
+    let _0: (); // return
+    let state: &'_0 mut closure::<()>; // arg #1
+    let args: ((),); // arg #2
+    let _3: &'0 closure::<()>; // anonymous local
+
+    storage_live(_0)
+    _0 = ()
+    storage_live(_3)
+    _3 = &(*state)
+    _0 = call::<()><'2>(move _3, move args)
+    ↳⚡ storage_dead(_3)
+        storage_dead(args)
+        storage_dead(state)
+        unwind_continue
+    storage_dead(_3)
+    storage_dead(args)
+    storage_dead(state)
+    return
+}
+
 // Full name: test_crate::main
 pub fn main()
 {
@@ -186,11 +263,13 @@ pub fn main()
     let _1: (); // anonymous local
     let _2: (); // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_1)
     storage_live(_2)
     _2 = ()
     _1 = foo::<()>(move _2)
+    ↳⚡ unwind_continue
     storage_dead(_2)
     storage_dead(_1)
     _0 = ()

@@ -4,6 +4,7 @@ use crate::hax;
 use crate::hax::SInto;
 use charon_lib::ast::*;
 use charon_lib::formatter::IntoFormatter;
+use charon_lib::options::ConstHandling;
 use charon_lib::pretty::FmtWithCtx;
 use derive_generic_visitor::Visitor;
 use itertools::Itertools;
@@ -491,6 +492,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
                 output: self.translate_ty(span, output_ty)?,
                 is_unsafe: false,
                 abi: Abi::rust(),
+                is_variadic: false,
             };
 
             let body = if item_meta.opacity.with_private_contents().is_opaque() {
@@ -522,6 +524,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
                 output: self.translate_ty(span, ty)?,
                 is_unsafe: false,
                 abi: Abi::rust(),
+                is_variadic: false,
             },
             _ => panic!("Unexpected definition for function: {def:?}"),
         };
@@ -548,13 +551,14 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             Body::Intrinsic { name, arg_names }
         } else if let Some(name) = self.t_ctx.extern_item_symbol_name(def) {
             Body::Extern(name)
-        } else if item_meta.lang_item.as_deref() == Some(builtins::BOX_ASSUME_INIT_INTO_VEC_UNSAFE)
+        } else if item_meta.diagnostic_item.as_deref()
+            == Some(builtins::BOX_ASSUME_INIT_INTO_VEC_UNSAFE)
             && self.options.treat_box_as_builtin
         {
             // FIXME(#865): the MIR we get is unusably optimized. Instead we build our own body
             // here.
             self.build_box_assume_init_into_vec_unsafe(span, def)?
-        } else if item_meta.lang_item.as_deref() == Some("drop_glue") {
+        } else if item_meta.lang_item.as_ref() == Some(&from_rustc::LangItem::DropGlue) {
             self.build_drop_glue_body(span, def, &signature)?
         } else if item_meta.opacity.with_private_contents().is_opaque() {
             Body::Opaque
@@ -609,16 +613,27 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             _ => panic!("Unexpected def for constant: {def:?}"),
         };
 
-        let initializer = self.register_item(span, def.this(), TransItemSourceKind::Fun);
-        let value = ConstantExpr {
-            kind: ConstantExprKind::Call(
-                FnPtr::new(
-                    FnPtrKind::Fun(FunId::Regular(initializer)),
-                    self.outermost_generics().identity_args(),
+        // With `--consts=values`, try to evaluate the constant/static into a value. This
+        // isn't always possible (e.g. for generic constants or recursive statics), in which
+        // case we fall back to a call to the initializer below.
+        let value = if matches!(self.options.consts, ConstHandling::Values)
+            && let Some(evaluated) = self.evaluate_const_def(def)
+        {
+            self.translate_constant_expr(span, &evaluated)?
+        } else {
+            // Default: the value is a call to the initializer function, which uses the same
+            // generic parameters as the global.
+            let initializer = self.register_item(span, def.this(), TransItemSourceKind::Fun);
+            ConstantExpr {
+                kind: ConstantExprKind::Call(
+                    FnPtr::new(
+                        FnPtrKind::Fun(FunId::Regular(initializer)),
+                        self.outermost_generics().identity_args(),
+                    ),
+                    vec![],
                 ),
-                vec![],
-            ),
-            ty: ty.clone(),
+                ty: ty.clone(),
+            }
         };
 
         Ok(GlobalDecl {

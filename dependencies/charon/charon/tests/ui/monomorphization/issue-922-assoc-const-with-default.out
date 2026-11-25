@@ -4,11 +4,11 @@
 opaque type {vtable}
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -16,7 +16,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::mem::size_of::<()>
-#[lang_item("mem_size_of")]
+#[diagnostic_item("mem_size_of")]
 pub fn size_of::<()>() -> usize
 = <opaque>
 
@@ -33,8 +33,10 @@ pub fn IS_ZST::<()>() -> bool
     let _0: bool; // return
     let _1: usize; // anonymous local
 
+    storage_live(_0)
     storage_live(_1)
     _1 = size_of::<()>()
+    ↳⚡ unwind_continue
     _0 = move _1 == const 0usize
     storage_dead(_1)
     return
@@ -49,6 +51,7 @@ fn main()
     let _0: (); // return
     let _1: bool; // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_1)
     _1 = copy IS_ZST::<()>

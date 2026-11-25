@@ -108,17 +108,15 @@ fn main() {
           prune n1
           store &b_1 <- 0:int
           store &var_0 <- null:void
-          jmp node_3
+          n2:void = load &var_0
+          ret n2
 
       #node_2:
           prune __sil_lnot(n1)
           store &b_1 <- 1:int
           store &var_0 <- null:void
-          jmp node_3
-
-      #node_3:
-          n2:void = load &var_0
-          ret n2
+          n3:void = load &var_0
+          ret n3
 
     }
     |}]
@@ -203,17 +201,15 @@ fn main() {
           prune n1
           n2:int = load &x_2
           store &var_0 <- n2:int
-          jmp node_3
+          n3:int = load &var_0
+          ret n3
 
       #node_2:
           prune __sil_lnot(n1)
-          n3:int = load &y_3
-          store &var_0 <- n3:int
-          jmp node_3
-
-      #node_3:
-          n4:int = load &var_0
-          ret n4
+          n4:int = load &y_3
+          store &var_0 <- n4:int
+          n5:int = load &var_0
+          ret n5
 
     }
 
@@ -535,17 +531,15 @@ fn main() {
           prune n4
           n5:int = load &x_1
           store &var_0 <- n5:int
-          jmp node_3
+          n6:int = load &var_0
+          ret n6
 
       #node_2:
           prune __sil_lnot(n4)
-          n6:int = load &y_2
-          store &var_0 <- n6:int
-          jmp node_3
-
-      #node_3:
-          n7:int = load &var_0
-          ret n7
+          n7:int = load &y_2
+          store &var_0 <- n7:int
+          n8:int = load &var_0
+          ret n8
 
     }
 
@@ -623,24 +617,22 @@ fn main() {
       #node_2:
           prune __sil_lnot(n2)
           store &var_0 <- 3:int
-          jmp node_5
+          n6:int = load &var_0
+          ret n6
 
       #node_3:
           prune n5
           store &var_0 <- 1:int
-          jmp node_6
+          jmp node_5
 
       #node_4:
           prune __sil_lnot(n5)
           store &var_0 <- 2:int
-          jmp node_6
+          jmp node_5
 
       #node_5:
-          n6:int = load &var_0
-          ret n6
-
-      #node_6:
-          jmp node_5
+          n7:int = load &var_0
+          ret n7
 
     }
 

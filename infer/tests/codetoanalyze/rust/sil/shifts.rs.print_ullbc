@@ -6,11 +6,12 @@ fn main()
     let _0: (); // return
     let _1: u8; // anonymous local
     let _2: u8; // anonymous local
-    let x_3: i8; // local
+    let x: i8; // local
     let _4: i8; // anonymous local
     let _5: i8; // anonymous local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
         storage_live(_1);
         _1 = const 1u8 panic.<< const 3i32;
@@ -18,16 +19,16 @@ fn main()
         storage_live(_2);
         _2 = const 128u8 panic.>> const 7i32;
         storage_dead(_2);
-        storage_live(x_3);
-        x_3 = const -2i8;
+        storage_live(x);
+        x = const -2i8;
         storage_live(_4);
         storage_live(_5);
-        _5 = copy x_3;
+        _5 = copy x;
         _4 = move _5 panic.>> const 1i32;
         storage_dead(_5);
         storage_dead(_4);
         _0 = ();
-        storage_dead(x_3);
+        storage_dead(x);
         return;
     }
 }

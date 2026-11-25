@@ -2,7 +2,7 @@
 //! reconstruction. In effect, this is a cleaned up version of MIR.
 pub use crate::ast::*;
 use crate::ids::IndexVec;
-use derive_generic_visitor::{Drive, DriveMut};
+use derive_generic_visitor::{Drive, DriveMut, DriveTwo};
 use macros::{EnumAsGetters, EnumIsA, VariantIndexArity, VariantName};
 use serde_state::{DeserializeState, SerializeState};
 
@@ -29,27 +29,29 @@ pub type ExprBody = GExprBody<BodyContents>;
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 pub enum StatementKind {
     Assign(Place, Rvalue),
     /// A call. For now, we don't support dynamic calls (i.e. to a function pointer in memory).
     SetDiscriminant(Place, VariantId),
-    /// Equivalent to std::intrinsics::copy_nonoverlapping; this is not modelled as a function
-    /// call as it cannot diverge
-    CopyNonOverlapping(Box<CopyNonOverlapping>),
     /// Indicates that this local should be allocated; if it is already allocated, this frees
-    /// the local and re-allocates it. The return value and arguments do not receive a
-    /// `StorageLive`. We ensure in the micro-pass `insert_storage_lives` that all other locals
-    /// have a `StorageLive` associated with them.
+    /// the local and re-allocates it. The arguments do not receive a `StorageLive`. We ensure in
+    /// the micro-pass `insert_storage_statements` that all other locals have a `StorageLive`
+    /// associated with them.
     StorageLive(LocalId),
     /// Indicates that this local should be deallocated; if it is already deallocated, this is
     /// a no-op. A local may not have a `StorageDead` in the function's body, in which case it
-    /// is implicitly deallocated at the end of the function.
+    /// is implicitly deallocated at the end of the function. The return local does not receive a
+    /// `StorageDead`. We ensure in the micro-pass `insert_storage_statements` that all other locals
+    /// have a `StorageDead` before function exits.
     StorageDead(LocalId),
     /// A place is mentioned, but not accessed. The place itself must still be valid though, so
     /// this statement is not a no-op: it can trigger UB if the place's projections are not valid
     /// (e.g. because they go out of bounds).
     PlaceMention(Place),
+    /// Statements that only affect borrow-checking.
+    Borrowck(BorrowckStatement),
     /// A non-diverging runtime check for a condition. This can be either:
     /// - Emitted for inlined "assumes" (which cause UB on failure)
     /// - Reconstructed from `if b { panic() }` if `--reconstruct-asserts` is set.
@@ -64,7 +66,9 @@ pub enum StatementKind {
     Nop,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
+)]
 pub struct Statement {
     pub span: Span,
     pub kind: StatementKind,
@@ -87,6 +91,7 @@ pub struct Statement {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 #[cfg_attr(feature = "charon_on_charon", charon::rename("Switch"))]
 pub enum SwitchTargets {
@@ -110,6 +115,7 @@ pub enum SwitchTargets {
     DeserializeState,
     Drive,
     DriveMut,
+    DriveTwo,
 )]
 pub enum TerminatorKind {
     Goto {
@@ -155,10 +161,13 @@ pub enum TerminatorKind {
     /// Handles panics and impossible cases.
     Abort(AbortKind),
     Return,
+    /// Unwind out of the current function into its caller.
     UnwindResume,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
+)]
 pub struct Terminator {
     pub span: Span,
     pub kind: TerminatorKind,
@@ -168,7 +177,9 @@ pub struct Terminator {
     pub comments_before: Vec<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut)]
+#[derive(
+    Debug, PartialEq, Eq, Clone, SerializeState, DeserializeState, Drive, DriveMut, DriveTwo,
+)]
 #[cfg_attr(feature = "charon_on_charon", charon::rename("Block"))]
 pub struct BlockData {
     pub statements: Vec<Statement>,

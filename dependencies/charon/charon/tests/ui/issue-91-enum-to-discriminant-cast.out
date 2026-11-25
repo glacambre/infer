@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,8 @@ pub trait Sized<Self>
 }
 
 // Full name: core::clone::Clone
-#[lang_item("clone")]
+#[lang_item(Clone)]
+#[diagnostic_item("Clone")]
 pub trait Clone<Self>
 {
     proof ImpliedClause0: (Self: Sized)
@@ -22,7 +23,7 @@ pub trait Clone<Self>
 }
 
 // Full name: core::clone::TrivialClone
-#[lang_item("trivial_clone")]
+#[lang_item(TrivialClone)]
 pub trait TrivialClone<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -31,7 +32,8 @@ pub trait TrivialClone<Self>
 }
 
 // Full name: core::marker::Copy
-#[lang_item("copy")]
+#[lang_item(Copy)]
+#[diagnostic_item("Copy")]
 pub trait Copy<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -46,12 +48,14 @@ enum Foo {
 }
 
 // Full name: test_crate::{impl Clone for Foo}::clone
-pub fn clone<'_0>(self_1: &'_0 Foo) -> Foo
+pub fn clone<'_0>(self: &'_0 Foo) -> Foo
 {
     let _0: Foo; // return
-    let self_1: &'1 Foo; // arg #1
+    let self: &'1 Foo; // arg #1
 
-    _0 = copy (*self_1)
+    storage_live(_0)
+    _0 = copy (*self)
+    storage_dead(self)
     return
 }
 
@@ -99,12 +103,14 @@ fn main()
     let _10: Ordering; // anonymous local
     let _11: isize; // anonymous local
 
+    storage_live(_0)
     storage_live(_4)
     storage_live(_7)
     storage_live(_11)
     _0 = ()
     storage_live(x_1)
     x_1 = Foo::A {  }
+    fake_read(x_1)
     storage_live(_2)
     storage_live(_3)
     _3 = copy x_1
@@ -121,6 +127,7 @@ fn main()
     storage_dead(_5)
     storage_live(x_8)
     x_8 = Ordering::Greater {  }
+    fake_read(x_8)
     storage_live(_9)
     storage_live(_10)
     _10 = move x_8
@@ -131,6 +138,9 @@ fn main()
     _0 = ()
     storage_dead(x_8)
     storage_dead(x_1)
+    storage_dead(_11)
+    storage_dead(_7)
+    storage_dead(_4)
     return
 }
 

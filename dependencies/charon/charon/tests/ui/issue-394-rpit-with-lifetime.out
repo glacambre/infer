@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,17 +13,18 @@ pub trait Sized<Self>
 }
 
 // Full name: core::option::Option
-#[lang_item("Option")]
+#[lang_item(Option)]
+#[diagnostic_item("Option")]
 pub enum Option<T>
 where
     TraitClause0: (T: Sized),
 {
   None,
-  Some(T),
+  Some { _0: T },
 }
 
 // Full name: core::marker::Tuple
-#[lang_item("tuple_trait")]
+#[lang_item(Tuple)]
 pub trait Tuple<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -31,7 +32,7 @@ pub trait Tuple<Self>
 }
 
 // Full name: core::ops::function::FnOnce
-#[lang_item("fn_once")]
+#[lang_item(FnOnce)]
 pub trait FnOnce<Self, Args>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -44,7 +45,7 @@ pub trait FnOnce<Self, Args>
 }
 
 // Full name: core::ops::function::FnMut
-#[lang_item("fn_mut")]
+#[lang_item(FnMut)]
 pub trait FnMut<Self, Args>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -70,7 +71,7 @@ where
 = <opaque>
 
 // Full name: core::marker::Destruct
-#[lang_item("destruct")]
+#[lang_item(Destruct)]
 pub trait Destruct<Self>
 {
     fn drop_glue<'_0_1>;
@@ -81,23 +82,32 @@ pub trait Destruct<Self>
 struct closure<'a> {}
 
 // Full name: test_crate::sparse_transitions::{impl FnMut<()> for closure<'a>}::call_mut
-fn call_mut<'a, '_1>(_1: &'_1 mut closure<'a>, tupled_args_2: ()) -> Option<u8>[{built_in impl Sized for u8}]
+fn call_mut<'a, '_1>(_1: &'_1 mut closure<'a>, tupled_args: ()) -> Option<u8>[{built_in impl Sized for u8}]
+where
+    RegionOutlives0: 'a: '_1,
 {
     let _0: Option<u8>[{built_in impl Sized for u8}]; // return
     let _1: &'1 mut closure<'a>; // arg #1
-    let tupled_args_2: (); // arg #2
+    let tupled_args: (); // arg #2
 
+    storage_live(_0)
     _0 = Option::None {  }
+    storage_dead(tupled_args)
+    storage_dead(_1)
     return
 }
 
 // Full name: test_crate::sparse_transitions::closure::{impl Destruct for closure<'a>}::drop_glue
 unsafe fn drop_glue<'a, '_1>(_1: &'_1 mut closure<'a>)
+where
+    RegionOutlives0: 'a: '_1,
 {
     let _0: (); // return
     let _1: &'1 mut closure<'a>; // arg #1
 
+    storage_live(_0)
     _0 = ()
+    storage_dead(_1)
     return
 }
 
@@ -109,10 +119,27 @@ fn call_once<'a>(_1: closure<'a>, _2: ()) -> Option<u8>[{built_in impl Sized for
     let _2: (); // arg #2
     let _3: &'1 mut closure<'a>; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
     _3 = &mut _1
     _0 = call_mut<'a, '4>(move _3, move _2)
+    ↳⚡ drop[drop_glue<'a, '7>] _1
+        ↳⚡ storage_dead(_3)
+            storage_dead(_2)
+            storage_dead(_1)
+            unwind_terminate
+        storage_dead(_3)
+        storage_dead(_2)
+        storage_dead(_1)
+        unwind_continue
     drop[drop_glue<'a, '10>] _1
+    ↳⚡ storage_dead(_3)
+        storage_dead(_2)
+        storage_dead(_1)
+        unwind_continue
+    storage_dead(_3)
+    storage_dead(_2)
+    storage_dead(_1)
     return
 }
 
@@ -143,9 +170,11 @@ fn sparse_transitions<'a>() -> FromFn<closure<'a>>[{built_in impl Sized for clos
     let _0: FromFn<closure<'6>>[{built_in impl Sized for closure<'6>}]; // return
     let _1: closure<'9>; // anonymous local
 
+    storage_live(_0)
     storage_live(_1)
     _1 = closure {  }
     _0 = from_fn<u8, closure<'12>>[{built_in impl Sized for u8}, {built_in impl Sized for closure<'12>}, impl_FnMut_unit_for_closure<'12>](move _1)
+    ↳⚡ unwind_continue
     storage_dead(_1)
     return
 }

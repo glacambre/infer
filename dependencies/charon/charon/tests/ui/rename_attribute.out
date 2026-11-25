@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -21,34 +21,41 @@ pub trait BoolTrait<Self>
     vtable: test_crate::BoolTrait::{vtable}
 }
 
-pub fn test_crate::BoolTrait::ret_true<'_0, Self>(self_1: &'_0 Self) -> bool
+pub fn test_crate::BoolTrait::ret_true<'_0, Self>(self: &'_0 Self) -> bool
 where
     TraitClause0: (Self: BoolTrait),
+    TypeOutlives0: Self: '_0,
 {
     let _0: bool; // return
-    let self_1: &'1 Self; // arg #1
+    let self: &'1 Self; // arg #1
 
+    storage_live(_0)
     _0 = const true
+    storage_dead(self)
     return
 }
 
 // Full name: test_crate::{impl BoolTrait for bool}::get_bool
-pub fn get_bool<'_0>(self_1: &'_0 bool) -> bool
+pub fn get_bool<'_0>(self: &'_0 bool) -> bool
 {
     let _0: bool; // return
-    let self_1: &'1 bool; // arg #1
+    let self: &'1 bool; // arg #1
 
-    _0 = copy (*self_1)
+    storage_live(_0)
+    _0 = copy (*self)
+    storage_dead(self)
     return
 }
 
 // Full name: test_crate::{impl BoolTrait for bool}::ret_true
-pub fn impl_BoolTrait_for_bool::ret_true<'_0>(self_1: &'_0 bool) -> bool
+pub fn impl_BoolTrait_for_bool::ret_true<'_0>(self: &'_0 bool) -> bool
 {
     let _0: bool; // return
-    let self_1: &'1 bool; // arg #1
+    let self: &'1 bool; // arg #1
 
+    storage_live(_0)
     _0 = const true
+    storage_dead(self)
     return
 }
 
@@ -61,31 +68,40 @@ impl "impl_BoolTrait_for_bool" BoolTrait for bool {
 }
 
 // Full name: test_crate::test_bool_trait
-pub fn test_bool_trait<T>(x_1: bool) -> bool
+pub fn test_bool_trait<T>(x: bool) -> bool
 where
     TraitClause0: (T: Sized),
 {
     let _0: bool; // return
-    let x_1: bool; // arg #1
+    let x: bool; // arg #1
     let _2: bool; // anonymous local
     let _3: &'1 bool; // anonymous local
     let _4: &'2 bool; // anonymous local
 
+    storage_live(_0)
     storage_live(_2)
     storage_live(_3)
-    _3 = &x_1
+    _3 = &x
     _2 = get_bool<'4>(move _3)
+    ↳⚡ storage_dead(x)
+        unwind_continue
     if move _2 {
-        storage_dead(_3)
-        storage_live(_4)
-        _4 = &x_1
-        _0 = impl_BoolTrait_for_bool::ret_true<'6>(move _4)
-        storage_dead(_4)
     } else {
         storage_dead(_3)
         _0 = const false
+        storage_dead(_2)
+        storage_dead(x)
+        return
     }
+    storage_dead(_3)
+    storage_live(_4)
+    _4 = &x
+    _0 = impl_BoolTrait_for_bool::ret_true<'6>(move _4)
+    ↳⚡ storage_dead(x)
+        unwind_continue
+    storage_dead(_4)
     storage_dead(_2)
+    storage_dead(x)
     return
 }
 
@@ -112,6 +128,7 @@ fn C() -> u32
     let _2: u32; // anonymous local
     let _3: u32; // anonymous local
 
+    storage_live(_0)
     storage_live(_2)
     storage_live(_3)
     storage_live(_1)

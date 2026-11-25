@@ -1,4 +1,4 @@
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait core::marker::MetaSized<Self>
 
 trait test_crate::Trait<Self>
@@ -14,6 +14,7 @@ where
 {
     let _0: usize; // return
 
+    storage_live(_0)
     _0 = const 1usize
     return
 }

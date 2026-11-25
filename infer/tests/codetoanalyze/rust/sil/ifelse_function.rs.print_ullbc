@@ -1,32 +1,36 @@
 # Final ULLBC before serialization:
 
 // Full name: ifelse_function::ifelse
-fn ifelse(b_1: bool, x_2: i32, y_3: i32) -> i32
+fn ifelse(b: bool, x: i32, y: i32) -> i32
 {
     let _0: i32; // return
-    let b_1: bool; // arg #1
-    let x_2: i32; // arg #2
-    let y_3: i32; // arg #3
+    let b: bool; // arg #1
+    let x: i32; // arg #2
+    let y: i32; // arg #3
     let _4: bool; // anonymous local
 
     bb0: {
+        storage_live(_0);
         storage_live(_4);
-        _4 = copy b_1;
+        _4 = copy b;
         if move _4 -> bb1 else -> bb2;
     }
 
     bb1: {
-        _0 = copy x_2;
-        goto bb3;
+        _0 = copy x;
+        storage_dead(_4);
+        storage_dead(y);
+        storage_dead(x);
+        storage_dead(b);
+        return;
     }
 
     bb2: {
-        _0 = copy y_3;
-        goto bb3;
-    }
-
-    bb3: {
+        _0 = copy y;
         storage_dead(_4);
+        storage_dead(y);
+        storage_dead(x);
+        storage_dead(b);
         return;
     }
 }
@@ -35,12 +39,13 @@ fn ifelse(b_1: bool, x_2: i32, y_3: i32) -> i32
 fn main()
 {
     let _0: (); // return
-    let x_1: i32; // local
+    let x: i32; // local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(x_1);
-        x_1 = ifelse(const true, const 10i32, const 20i32) -> bb2 (unwind: bb1);
+        storage_live(x);
+        x = ifelse(const true, const 10i32, const 20i32) -> bb2 (unwind: bb1);
     }
 
     bb1: {
@@ -49,7 +54,7 @@ fn main()
 
     bb2: {
         _0 = ();
-        storage_dead(x_1);
+        storage_dead(x);
         return;
     }
 }

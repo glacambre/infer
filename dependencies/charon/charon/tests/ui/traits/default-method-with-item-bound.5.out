@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,7 +13,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::Tuple
-#[lang_item("tuple_trait")]
+#[lang_item(Tuple)]
 pub trait Tuple<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -21,7 +21,7 @@ pub trait Tuple<Self>
 }
 
 // Full name: core::ops::function::FnOnce
-#[lang_item("fn_once")]
+#[lang_item(FnOnce)]
 pub trait FnOnce<Self, Args>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -34,7 +34,7 @@ pub trait FnOnce<Self, Args>
 }
 
 // Full name: core::ops::function::FnMut
-#[lang_item("fn_mut")]
+#[lang_item(FnMut)]
 pub trait FnMut<Self, Args>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -69,23 +69,28 @@ where
     TraitClause0: (T: Sized),
     TypeOutlives0: T: 'a,
 {
-  &'a T,
+  _0: &'a T,
 }
 
 // Full name: test_crate::{impl Iterator for Iter<'a, T>[TraitClause0]}::rposition
-fn rposition<'a, '_1, T, P>(self_1: &'_1 mut Iter<'a, T>[TraitClause0])
+fn rposition<'a, '_1, T, P>(self: &'_1 mut Iter<'a, T>[TraitClause0])
 where
     TraitClause0: (T: Sized),
     TraitClause1: (P: Sized),
     TraitClause2: (P: FnMut<(TraitClause3::ImpliedClause1::Item,)>),
     TraitClause3: (Iter<'a, T>[TraitClause0]: DoubleEndedIterator),
+    TypeOutlives0: T: 'a,
+    TypeOutlives1: T: '_1,
+    RegionOutlives0: 'a: '_1,
     TypeConstraint0: TraitClause2::ImpliedClause1::Output = (),
 {
     let _0: (); // return
-    let self_1: &'3 mut Iter<'4, T>[TraitClause0]; // arg #1
+    let self: &'3 mut Iter<'4, T>[TraitClause0]; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
+    storage_dead(self)
     return
 }
 
@@ -93,6 +98,7 @@ where
 impl<'a, T> "impl_Iterator_for_Iter" Iterator for Iter<'a, T>[TraitClause0]
 where
     TraitClause0: (T: Sized),
+    TypeOutlives0: T: 'a,
 {
     proof ImpliedClause0: (Iter<'a, T>[TraitClause0]: MetaSized) = {built_in impl MetaSized for Iter<'a, T>[TraitClause0]}
     proof ImpliedClause1: (&'a T: Sized) = {built_in impl Sized for &'a T}
@@ -105,6 +111,7 @@ where
 impl<'a, T> "impl_DoubleEndedIterator_for_Iter" DoubleEndedIterator for Iter<'a, T>[TraitClause0]
 where
     TraitClause0: (T: Sized),
+    TypeOutlives0: T: 'a,
 {
     proof ImpliedClause0: (Iter<'a, T>[TraitClause0]: MetaSized) = {built_in impl MetaSized for Iter<'a, T>[TraitClause0]}
     proof ImpliedClause1: (Iter<'a, T>[TraitClause0]: Iterator) = impl_Iterator_for_Iter<'_, T>[TraitClause0]

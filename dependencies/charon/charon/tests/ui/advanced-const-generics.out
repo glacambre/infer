@@ -1,7 +1,8 @@
 # Final LLBC before serialization:
 
 // Full name: core::cmp::PartialEq
-#[lang_item("eq")]
+#[lang_item(PartialEq)]
+#[diagnostic_item("PartialEq")]
 pub trait PartialEq<Self, Rhs>
 {
     fn eq<'_0_1, '_1_1>;
@@ -9,7 +10,7 @@ pub trait PartialEq<Self, Rhs>
 }
 
 // Full name: core::cmp::Eq
-#[lang_item("Eq")]
+#[diagnostic_item("Eq")]
 pub trait Eq<Self>
 {
     proof ImpliedClause0: (Self: PartialEq<Self>)
@@ -20,14 +21,15 @@ pub trait Eq<Self>
 pub fn core::cmp::Eq::assert_fields_are_eq<'_0, Self>(_1: &'_0 Self)
 where
     TraitClause0: (Self: Eq),
+    TypeOutlives0: Self: '_0,
 = <opaque>
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -35,7 +37,7 @@ pub trait Sized<Self>
 }
 
 // Full name: core::marker::StructuralPartialEq
-#[lang_item("structural_peq")]
+#[lang_item(StructuralPeq)]
 pub trait StructuralPartialEq<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -43,7 +45,7 @@ pub trait StructuralPartialEq<Self>
 }
 
 // Full name: core::marker::ConstParamTy_
-#[lang_item("const_param_ty")]
+#[lang_item(ConstParamTy)]
 pub trait ConstParamTy_<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -53,14 +55,14 @@ pub trait ConstParamTy_<Self>
 }
 
 // Full name: core::result::Result
-#[lang_item("Result")]
+#[diagnostic_item("Result")]
 pub enum Result<T, E>
 where
     TraitClause0: (T: Sized),
     TraitClause1: (E: Sized),
 {
-  Ok(T),
-  Err(E),
+  Ok { _0: T },
+  Err { _0: E },
 }
 
 // Full name: test_crate::Foo
@@ -70,48 +72,55 @@ enum Foo {
 }
 
 // Full name: test_crate::{impl Eq for Foo}::assert_fields_are_eq
-pub fn impl_Eq_for_Foo::assert_fields_are_eq<'_0>(self_1: &'_0 Foo)
+pub fn impl_Eq_for_Foo::assert_fields_are_eq<'_0>(self: &'_0 Foo)
 {
     let _0: (); // return
-    let self_1: &'1 Foo; // arg #1
+    let self: &'1 Foo; // arg #1
 
+    storage_live(_0)
     _0 = ()
     _0 = ()
+    storage_dead(self)
     return
 }
 
 // Full name: test_crate::{impl PartialEq<Foo> for Foo}::eq
-pub fn eq<'_0, '_1>(self_1: &'_0 Foo, other_2: &'_1 Foo) -> bool
+pub fn eq<'_0, '_1>(self: &'_0 Foo, other: &'_1 Foo) -> bool
 {
     let _0: bool; // return
-    let self_1: &'1 Foo; // arg #1
-    let other_2: &'2 Foo; // arg #2
-    let __self_discr_3: isize; // local
+    let self: &'1 Foo; // arg #1
+    let other: &'2 Foo; // arg #2
+    let __self_discr: isize; // local
     let _4: &'3 Foo; // anonymous local
-    let __arg1_discr_5: isize; // local
+    let __arg1_discr: isize; // local
     let _6: &'4 Foo; // anonymous local
     let _7: isize; // anonymous local
     let _8: isize; // anonymous local
 
-    storage_live(__self_discr_3)
+    storage_live(_0)
+    storage_live(__self_discr)
     storage_live(_4)
-    _4 = &(*self_1)
-    __self_discr_3 = @discriminant((*_4))
+    _4 = &(*self)
+    __self_discr = @discriminant((*_4))
     storage_dead(_4)
-    storage_live(__arg1_discr_5)
+    fake_read(__self_discr)
+    storage_live(__arg1_discr)
     storage_live(_6)
-    _6 = &(*other_2)
-    __arg1_discr_5 = @discriminant((*_6))
+    _6 = &(*other)
+    __arg1_discr = @discriminant((*_6))
     storage_dead(_6)
+    fake_read(__arg1_discr)
     storage_live(_7)
-    _7 = copy __self_discr_3
+    _7 = copy __self_discr
     storage_live(_8)
-    _8 = copy __arg1_discr_5
+    _8 = copy __arg1_discr
     _0 = move _7 == move _8
     storage_dead(_8)
     storage_dead(_7)
-    storage_dead(__arg1_discr_5)
-    storage_dead(__self_discr_3)
+    storage_dead(__arg1_discr)
+    storage_dead(__self_discr)
+    storage_dead(other)
+    storage_dead(self)
     return
 }
 
@@ -143,20 +152,23 @@ impl "impl_ConstParamTy__for_Foo" ConstParamTy_ for Foo {
 }
 
 // Full name: test_crate::{impl Debug for Foo}::fmt
-pub fn fmt<'_0, '_1, '_2>(self_1: &'_0 Foo, f_2: &'_1 mut Formatter<'_2>) -> Result<(), Error>[{built_in impl Sized for ()}, {built_in impl Sized for Error}]
+pub fn fmt<'_0, '_1, '_2>(self: &'_0 Foo, f: &'_1 mut Formatter<'_2>) -> Result<(), Error>[{built_in impl Sized for ()}, {built_in impl Sized for Error}]
+where
+    RegionOutlives0: '_2: '_1,
 {
     let _0: Result<(), Error>[{built_in impl Sized for ()}, {built_in impl Sized for Error}]; // return
-    let self_1: &'1 Foo; // arg #1
-    let f_2: &'5 mut Formatter<'6>; // arg #2
+    let self: &'1 Foo; // arg #1
+    let f: &'5 mut Formatter<'6>; // arg #2
     let _3: &'7 mut Formatter<'8>; // anonymous local
     let _4: &'10 str; // anonymous local
     let _5: &'11 str; // anonymous local
     let _6: &'12 str; // anonymous local
 
+    storage_live(_0)
     storage_live(_3)
-    _3 = &two-phase-mut (*f_2) with_metadata(copy f_2.metadata)
+    _3 = &two-phase-mut (*f) with_metadata(copy f.metadata)
     storage_live(_4)
-    match (*self_1) {
+    match (*self) {
         Foo::A => {
             storage_live(_5)
             _5 = const "A"
@@ -171,8 +183,13 @@ pub fn fmt<'_0, '_1, '_2>(self_1: &'_0 Foo, f_2: &'_1 mut Formatter<'_2>) -> Res
         },
     }
     _0 = core::fmt::{Formatter<'a>}::write_str<'16, '19, '20>(move _3, move _4)
+    ↳⚡ storage_dead(f)
+        storage_dead(self)
+        unwind_continue
     storage_dead(_4)
     storage_dead(_3)
+    storage_dead(f)
+    storage_dead(self)
     return
 }
 
@@ -187,6 +204,7 @@ fn foo<const X : Foo>() -> Foo
 {
     let _0: Foo; // return
 
+    storage_live(_0)
     _0 = const X
     return
 }
@@ -195,15 +213,18 @@ fn foo<const X : Foo>() -> Foo
 fn bar<const N : usize>()
 {
     let _0: (); // return
-    let _1: [(); {const}<N>]; // anonymous local
+    let _1: [(); test_crate::bar::{const}#2<N>]; // anonymous local
     let _2: (); // anonymous local
 
+    storage_live(_0)
     _0 = ()
     storage_live(_1)
     storage_live(_2)
     _2 = ()
-    _1 = @ArrayRepeat<(), {const}<N>>(move _2)
+    _1 = @ArrayRepeat<(), test_crate::bar::{const}#2<N>>(move _2)
+    ↳⚡ undefined_behavior
     storage_dead(_2)
+    set_type(typeof(_1) <= [(); test_crate::bar::{const}#1<N>])
     storage_dead(_1)
     _0 = ()
     return

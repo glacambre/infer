@@ -4,24 +4,24 @@
 fn main()
 {
     let _0: (); // return
-    let a_1: u32; // local
-    let b_2: u32; // local
+    let a: u32; // local
+    let b: u32; // local
     let _3: u32; // anonymous local
     let _4: u32; // anonymous local
     let _5: u32; // anonymous local
     let _6: u32; // anonymous local
     let _7: u32; // anonymous local
     let _8: u32; // anonymous local
-    let c_9: i32; // local
-    let d_10: i32; // local
+    let c: i32; // local
+    let d: i32; // local
     let _11: i32; // anonymous local
     let _12: i32; // anonymous local
     let _13: i32; // anonymous local
     let _14: i32; // anonymous local
     let _15: i32; // anonymous local
     let _16: i32; // anonymous local
-    let e_17: i32; // local
-    let f_18: i32; // local
+    let e: i32; // local
+    let f: i32; // local
     let _19: i32; // anonymous local
     let _20: i32; // anonymous local
     let _21: i32; // anonymous local
@@ -30,80 +30,81 @@ fn main()
     let _24: i32; // anonymous local
 
     bb0: {
+        storage_live(_0);
         _0 = ();
-        storage_live(a_1);
-        a_1 = const 7u32;
-        storage_live(b_2);
-        b_2 = const 3u32;
+        storage_live(a);
+        a = const 7u32;
+        storage_live(b);
+        b = const 3u32;
         storage_live(_3);
         storage_live(_4);
-        _4 = copy a_1;
+        _4 = copy a;
         storage_live(_5);
-        _5 = copy b_2;
+        _5 = copy b;
         _3 = move _4 panic./ move _5;
         storage_dead(_5);
         storage_dead(_4);
         storage_dead(_3);
         storage_live(_6);
         storage_live(_7);
-        _7 = copy a_1;
+        _7 = copy a;
         storage_live(_8);
-        _8 = copy b_2;
+        _8 = copy b;
         _6 = move _7 panic.% move _8;
         storage_dead(_8);
         storage_dead(_7);
         storage_dead(_6);
-        storage_live(c_9);
-        c_9 = const 7i32;
-        storage_live(d_10);
-        d_10 = const -3i32;
+        storage_live(c);
+        c = const 7i32;
+        storage_live(d);
+        d = const -3i32;
         storage_live(_11);
         storage_live(_12);
-        _12 = copy c_9;
+        _12 = copy c;
         storage_live(_13);
-        _13 = copy d_10;
+        _13 = copy d;
         _11 = move _12 panic./ move _13;
         storage_dead(_13);
         storage_dead(_12);
         storage_dead(_11);
         storage_live(_14);
         storage_live(_15);
-        _15 = copy c_9;
+        _15 = copy c;
         storage_live(_16);
-        _16 = copy d_10;
+        _16 = copy d;
         _14 = move _15 panic.% move _16;
         storage_dead(_16);
         storage_dead(_15);
         storage_dead(_14);
-        storage_live(e_17);
-        e_17 = const -7i32;
-        storage_live(f_18);
-        f_18 = const 3i32;
+        storage_live(e);
+        e = const -7i32;
+        storage_live(f);
+        f = const 3i32;
         storage_live(_19);
         storage_live(_20);
-        _20 = copy e_17;
+        _20 = copy e;
         storage_live(_21);
-        _21 = copy f_18;
+        _21 = copy f;
         _19 = move _20 panic./ move _21;
         storage_dead(_21);
         storage_dead(_20);
         storage_dead(_19);
         storage_live(_22);
         storage_live(_23);
-        _23 = copy e_17;
+        _23 = copy e;
         storage_live(_24);
-        _24 = copy f_18;
+        _24 = copy f;
         _22 = move _23 panic.% move _24;
         storage_dead(_24);
         storage_dead(_23);
         storage_dead(_22);
         _0 = ();
-        storage_dead(f_18);
-        storage_dead(e_17);
-        storage_dead(d_10);
-        storage_dead(c_9);
-        storage_dead(b_2);
-        storage_dead(a_1);
+        storage_dead(f);
+        storage_dead(e);
+        storage_dead(d);
+        storage_dead(c);
+        storage_dead(b);
+        storage_dead(a);
         return;
     }
 }

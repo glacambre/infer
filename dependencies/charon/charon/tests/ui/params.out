@@ -1,11 +1,11 @@
 # Final LLBC before serialization:
 
 // Full name: core::marker::MetaSized
-#[lang_item("meta_sized")]
+#[lang_item(MetaSized)]
 pub trait MetaSized<Self>
 
 // Full name: core::marker::Sized
-#[lang_item("sized")]
+#[lang_item(Sized)]
 pub trait Sized<Self>
 {
     proof ImpliedClause0: (Self: MetaSized)
@@ -13,16 +13,18 @@ pub trait Sized<Self>
 }
 
 // Full name: alloc::alloc::Global
-#[lang_item("global_alloc_ty")]
+#[lang_item(GlobalAlloc)]
 pub struct Global {}
 
 // Full name: test_crate::test_static
-fn test_static(x_1: &'static u32) -> &'static u32
+fn test_static(x: &'static u32) -> &'static u32
 {
     let _0: &'1 u32; // return
-    let x_1: &'2 u32; // arg #1
+    let x: &'2 u32; // arg #1
 
-    _0 = copy x_1
+    storage_live(_0)
+    _0 = copy x
+    storage_dead(x)
     return
 }
 
@@ -39,7 +41,7 @@ where
     TypeOutlives0: T1: 'a,
     TypeOutlives1: T2: 'b,
 {
-  V1(&'a mut T1, &'b mut T2),
+  V1 { _0: &'a mut T1, _1: &'b mut T2 },
 }
 
 // Full name: test_crate::E1
@@ -52,8 +54,8 @@ where
     TypeOutlives2: T2: 'a,
     TypeOutlives3: T1: 'b,
 {
-  V1(&'a mut T1, &'b mut T2),
-  V2(alloc::boxed::Box<E1<'a, 'b, T2, T1>[TraitClause1, TraitClause0]>[{built_in impl MetaSized for E1<'a, 'b, T2, T1>[TraitClause1, TraitClause0]}, {built_in impl Sized for Global}]),
+  V1 { _0: &'a mut T1, _1: &'b mut T2 },
+  V2 { _0: alloc::boxed::Box<E1<'a, 'b, T2, T1>[TraitClause1, TraitClause0]>[{built_in impl MetaSized for E1<'a, 'b, T2, T1>[TraitClause1, TraitClause0]}, {built_in impl Sized for Global}] },
 }
 
 // Full name: test_crate::E2
@@ -66,8 +68,8 @@ where
     TypeOutlives2: T1: 'b,
     TypeOutlives3: T2: 'a,
 {
-  V1(&'a mut T1, &'b mut T2),
-  V3(alloc::boxed::Box<E2<'b, 'a, T1, T2>[TraitClause0, TraitClause1]>[{built_in impl MetaSized for E2<'b, 'a, T1, T2>[TraitClause0, TraitClause1]}, {built_in impl Sized for Global}]),
+  V1 { _0: &'a mut T1, _1: &'b mut T2 },
+  V3 { _0: alloc::boxed::Box<E2<'b, 'a, T1, T2>[TraitClause0, TraitClause1]>[{built_in impl MetaSized for E2<'b, 'a, T1, T2>[TraitClause0, TraitClause1]}, {built_in impl Sized for Global}] },
 }
 
 // Full name: test_crate::E3
@@ -84,10 +86,10 @@ where
     RegionOutlives0: 'a: 'c,
     RegionOutlives1: 'b: 'c,
 {
-  V1(&'a mut T1, &'b mut T2),
-  V2(alloc::boxed::Box<E3<'a, 'b, 'c, T2, T1>[TraitClause1, TraitClause0]>[{built_in impl MetaSized for E3<'a, 'b, 'c, T2, T1>[TraitClause1, TraitClause0]}, {built_in impl Sized for Global}]),
-  V3(alloc::boxed::Box<E3<'b, 'a, 'c, T1, T2>[TraitClause0, TraitClause1]>[{built_in impl MetaSized for E3<'b, 'a, 'c, T1, T2>[TraitClause0, TraitClause1]}, {built_in impl Sized for Global}]),
-  V4(&'c &'a T1),
+  V1 { _0: &'a mut T1, _1: &'b mut T2 },
+  V2 { _0: alloc::boxed::Box<E3<'a, 'b, 'c, T2, T1>[TraitClause1, TraitClause0]>[{built_in impl MetaSized for E3<'a, 'b, 'c, T2, T1>[TraitClause1, TraitClause0]}, {built_in impl Sized for Global}] },
+  V3 { _0: alloc::boxed::Box<E3<'b, 'a, 'c, T1, T2>[TraitClause0, TraitClause1]>[{built_in impl MetaSized for E3<'b, 'a, 'c, T1, T2>[TraitClause0, TraitClause1]}, {built_in impl Sized for Global}] },
+  V4 { _0: &'c &'a T1 },
 }
 
 // Full name: test_crate::E4
@@ -106,10 +108,10 @@ where
     RegionOutlives0: 'a: 'c,
     RegionOutlives1: 'b: 'c,
 {
-  V1(&'a mut T1, &'b mut T2),
-  V2(alloc::boxed::Box<E4<'a, 'b, 'c, T2, T1, T3>[TraitClause1, TraitClause0, TraitClause2]>[{built_in impl MetaSized for E4<'a, 'b, 'c, T2, T1, T3>[TraitClause1, TraitClause0, TraitClause2]}, {built_in impl Sized for Global}]),
-  V3(alloc::boxed::Box<E4<'b, 'a, 'c, T1, T2, T3>[TraitClause0, TraitClause1, TraitClause2]>[{built_in impl MetaSized for E4<'b, 'a, 'c, T1, T2, T3>[TraitClause0, TraitClause1, TraitClause2]}, {built_in impl Sized for Global}]),
-  V4(&'c &'a T3),
+  V1 { _0: &'a mut T1, _1: &'b mut T2 },
+  V2 { _0: alloc::boxed::Box<E4<'a, 'b, 'c, T2, T1, T3>[TraitClause1, TraitClause0, TraitClause2]>[{built_in impl MetaSized for E4<'a, 'b, 'c, T2, T1, T3>[TraitClause1, TraitClause0, TraitClause2]}, {built_in impl Sized for Global}] },
+  V3 { _0: alloc::boxed::Box<E4<'b, 'a, 'c, T1, T2, T3>[TraitClause0, TraitClause1, TraitClause2]>[{built_in impl MetaSized for E4<'b, 'a, 'c, T1, T2, T3>[TraitClause0, TraitClause1, TraitClause2]}, {built_in impl Sized for Global}] },
+  V4 { _0: &'c &'a T3 },
 }
 
 // Full name: test_crate::E5
@@ -128,10 +130,10 @@ where
     RegionOutlives0: 'c: 'a,
     RegionOutlives1: 'c: 'b,
 {
-  V1(&'a mut T1, &'b mut T2),
-  V2(alloc::boxed::Box<E5<'a, 'b, 'c, T2, T1, T3>[TraitClause1, TraitClause0, TraitClause2]>[{built_in impl MetaSized for E5<'a, 'b, 'c, T2, T1, T3>[TraitClause1, TraitClause0, TraitClause2]}, {built_in impl Sized for Global}]),
-  V3(alloc::boxed::Box<E5<'b, 'a, 'c, T1, T2, T3>[TraitClause0, TraitClause1, TraitClause2]>[{built_in impl MetaSized for E5<'b, 'a, 'c, T1, T2, T3>[TraitClause0, TraitClause1, TraitClause2]}, {built_in impl Sized for Global}]),
-  V4(&'a &'c T3),
+  V1 { _0: &'a mut T1, _1: &'b mut T2 },
+  V2 { _0: alloc::boxed::Box<E5<'a, 'b, 'c, T2, T1, T3>[TraitClause1, TraitClause0, TraitClause2]>[{built_in impl MetaSized for E5<'a, 'b, 'c, T2, T1, T3>[TraitClause1, TraitClause0, TraitClause2]}, {built_in impl Sized for Global}] },
+  V3 { _0: alloc::boxed::Box<E5<'b, 'a, 'c, T1, T2, T3>[TraitClause0, TraitClause1, TraitClause2]>[{built_in impl MetaSized for E5<'b, 'a, 'c, T1, T2, T3>[TraitClause0, TraitClause1, TraitClause2]}, {built_in impl Sized for Global}] },
+  V4 { _0: &'a &'c T3 },
 }
 
 // Full name: test_crate::S1
