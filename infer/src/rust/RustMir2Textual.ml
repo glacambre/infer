@@ -438,7 +438,7 @@ let mk_locals crate (locals : Charon.Generated_GAst.local list) (arg_count : int
       (varname, Textual.Typ.mk_without_attributes (ty_to_textual_typ crate local.local_ty)) )
 
 
-let mk_const_exp _crate (value : Charon.Generated_Types.constant_expr_kind) : Textual.Exp.t =
+let rec mk_const_exp crate (value : Charon.Generated_Types.constant_expr_kind) : Textual.Exp.t =
   match value with
   | CLiteral (VScalar (UnsignedScalar (_, n))) | CLiteral (VScalar (SignedScalar (_, n))) ->
       Textual.Exp.Const (Textual.Const.Int n)
@@ -455,6 +455,12 @@ let mk_const_exp _crate (value : Charon.Generated_Types.constant_expr_kind) : Te
           Charon.Generated_Types.pp_constant_expr_kind value )
   | CLiteral (VStr s) ->
       Textual.Exp.Const (Textual.Const.Str s)
+  | CCall (fn_ptr, args) ->
+      let proc_name = fun_name_from_fun_operand crate (FnOpRegular fn_ptr) in
+      let args =
+        List.map args ~f:(fun (arg : Charon.Types.constant_expr) -> mk_const_exp crate arg.kind)
+      in
+      Textual.Exp.call_non_virtual proc_name args
   | COpaque s ->
       L.die ExternalError "[CHARON ERROR] Unsupported constant expression: %s @." s
   | _ ->
@@ -1015,13 +1021,11 @@ let mk_decl crate (fun_decl : Charon.GAst.fun_decl) : Textual.Module.decl option
     None
 
 
-(* A global_decl in ULLBC is defined by the variable name and a generated function that produces the initial value *)
+(* A global's value is a constant expression, usually a call to its initializer function. *)
 let mk_global crate (global_decl : Charon.Generated_GAst.global_decl) =
-  let fun_decl = fun_map_find_id crate global_decl.init in
   let name = global_to_varname crate global_decl.item_meta in
   let typ = ty_to_textual_typ crate global_decl.ty in
-  let proc_name = mk_qualified_proc_name crate fun_decl.item_meta in
-  let init_exp = Textual.Exp.call_non_virtual proc_name [] in
+  let init_exp = mk_const_exp crate global_decl.value.kind in
   let global =
     Textual.Module.Global {Textual.Global.name; attributes= []; init_exp= Some init_exp; typ}
   in
