@@ -433,6 +433,7 @@ and constant_expr_kind =
           that function item.
 
           We eliminate this case in a micro-pass. *)
+  | CTypeId of ty  (** The [TypeId] value for a type. *)
   | CPtrNoProvenance of big_int
       (** A pointer with no provenance (e.g. 0 for the null pointer)
 
@@ -1138,9 +1139,9 @@ and layout = {
 
     On our side, we want to stay high-level and simple: we use string
     identifiers as much as possible, insert disambiguators only when necessary
-    (whenever we find an "impl" block, typically) and check that the
-    disambiguator is useless in the other situations (i.e., the disambiguator is
-    always equal to 0).
+    (for instance when we find an "impl" block or when two loaded crates have
+    the same name) and check that the disambiguator is useless in the other
+    situations (i.e., the disambiguator is always equal to 0).
 
     Moreover, the items are uniquely disambiguated by their (integer) ids
     ([TypeDeclId], etc.), and when extracting the code we have to deal with name

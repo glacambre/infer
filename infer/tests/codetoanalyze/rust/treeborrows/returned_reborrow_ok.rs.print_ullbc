@@ -32,7 +32,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(v_1);
-        v_1 = const 0 : i32;
+        v_1 = const 0i32;
         storage_live(p_2);
         p_2 = &mut v_1;
         storage_live(q_3);
@@ -47,7 +47,7 @@ fn main()
 
     bb2: {
         storage_dead(_4);
-        (*q_3) = const 1 : i32;
+        (*q_3) = const 1i32;
         _0 = ();
         storage_dead(q_3);
         storage_dead(p_2);

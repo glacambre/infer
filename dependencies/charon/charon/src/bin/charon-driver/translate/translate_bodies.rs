@@ -156,12 +156,15 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         if let Some(body) = self.get_mir(def.this(), span)? {
             Ok(self.translate_body(span, body, &def.source_text))
         } else {
-            if matches!(
-                def.kind(),
-                hax::FullDefKind::Const { .. } | hax::FullDefKind::AssocConst { .. }
-            ) && let Some(value) = def.const_value(self.hax_state_with_id())
-            {
-                // For globals we can generate a body by evaluating the global.
+            let evaluated_global = match def.kind() {
+                hax::FullDefKind::Const { .. } | hax::FullDefKind::AssocConst { .. } => {
+                    def.const_value(self.hax_state_with_id())
+                }
+                hax::FullDefKind::Static { .. } => def.static_value(self.hax_state_with_id()),
+                _ => None,
+            };
+            if let Some(value) = evaluated_global {
+                // For globals without MIR, generate a body by evaluating the global.
                 // TODO: we lost the MIR of some consts on a rustc update. A trait assoc const
                 // default value no longer has a cross-crate MIR so it's unclear how to retreive
                 // the value. See the `trait-default-const-cross-crate` test.
@@ -461,6 +464,56 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         };
 
         Ok(Body::Unstructured(body))
+    }
+
+    /// Generate a function body for `core::intrinsics::type_id`.
+    pub(crate) fn build_type_id_body(
+        &mut self,
+        span: Span,
+        def: &hax::FullDef<'tcx>,
+        signature: &FunSig,
+    ) -> Result<Body, Error> {
+        let generics = self.translate_generic_args(span, &def.this().generic_args, &[])?;
+        let type_id_ty = generics.types[0].clone();
+
+        let mut builder = BodyBuilder::new(span, signature.inputs.len());
+        let return_place = builder.new_var(Some("ret".to_string()), signature.output.clone());
+        let type_id = ConstantExpr {
+            kind: ConstantExprKind::TypeId(type_id_ty),
+            ty: signature.output.clone(),
+        };
+        builder.push_statement(StatementKind::Assign(
+            return_place,
+            Rvalue::Use(Operand::Const(Box::new(type_id)), WithRetag::No),
+        ));
+        Ok(Body::Unstructured(builder.build()))
+    }
+
+    /// Generate a function body for `core::ptr::drop_glue`.
+    pub(crate) fn build_drop_glue_body(
+        &mut self,
+        span: Span,
+        def: &hax::FullDef<'tcx>,
+        signature: &FunSig,
+    ) -> Result<Body, Error> {
+        let hax::FullDefKind::Fn { .. } = def.kind() else {
+            unreachable!()
+        };
+        let def_id = def.def_id().as_real_def_id().unwrap();
+        let rustc_args = def.this().rustc_args(self.hax_state_with_id());
+        let rustc_sig = self.tcx.fn_sig(def_id).instantiate(self.tcx, rustc_args);
+        // `skip_binder` is ok because we have that lifetime in scope.
+        let input_ty = rustc_sig.skip_binder().inputs()[0];
+        let pointee_ty = input_ty
+            .builtin_deref(true)
+            .expect("`drop_glue` argument is not a pointer");
+        let fn_ptr = self.translate_drop_glue_method_call(span, pointee_ty)?;
+
+        let mut builder = BodyBuilder::new(span, signature.inputs.len());
+        let _return_place = builder.new_var(Some("ret".to_string()), signature.output.clone());
+        let input = builder.new_var(None, signature.inputs[0].clone());
+        builder.insert_drop(input.deref(), fn_ptr);
+        Ok(Body::Unstructured(builder.build()))
     }
 }
 
@@ -1540,7 +1593,7 @@ impl<'tcx> BlockTransCtx<'tcx, '_, '_, '_> {
         unwind: &mir::UnwindAction,
     ) -> Result<TerminatorKind, Error> {
         let place_ty = place.ty(self.local_decls, self.tcx).ty;
-        let fn_ptr = self.translate_drop_in_place_method_call(span, place_ty)?;
+        let fn_ptr = self.translate_drop_glue_method_call(span, place_ty)?;
         let place = self.translate_place(span, place)?;
         let target = self.translate_basic_block_id(*target);
         let on_unwind = self.translate_unwind_action(span, unwind);

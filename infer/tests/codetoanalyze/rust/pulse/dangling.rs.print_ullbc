@@ -10,7 +10,7 @@ fn create_evil_pointer() -> *mut i32
 
     bb0: {
         storage_live(x_1);
-        x_1 = const 42 : i32;
+        x_1 = const 42i32;
         storage_live(x_ref_2);
         x_ref_2 = &mut x_1;
         storage_live(evil_pointer_3);
@@ -40,7 +40,7 @@ fn main()
     }
 
     bb2: {
-        (*evil_pointer_1) = const 10 : i32;
+        (*evil_pointer_1) = const 10i32;
         _0 = ();
         storage_dead(evil_pointer_1);
         return;

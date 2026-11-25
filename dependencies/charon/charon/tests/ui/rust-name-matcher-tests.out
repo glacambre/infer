@@ -16,12 +16,12 @@ pub trait Sized<Self>
 #[lang_item("destruct")]
 pub trait Destruct<Self>
 {
-    fn drop_in_place = drop_in_place<Self>
+    fn drop_glue<'_0_1> = drop_glue<'_0_1, Self>
     non-dyn-compatible
 }
 
-// Full name: core::marker::Destruct::drop_in_place
-unsafe fn drop_in_place<Self>(_1: *mut Self)
+// Full name: core::marker::Destruct::drop_glue
+unsafe fn drop_glue<'_0, Self>(_1: &'_0 mut Self)
 = <opaque>
 
 // Full name: core::option::Option
@@ -64,7 +64,7 @@ where
 = <method_without_default_body>
 
 // Full name: test_crate::{impl Trait<Option<T>[TraitClause0]> for alloc::boxed::Box<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]}::method
-fn {impl Trait<Option<T>[TraitClause0]> for alloc::boxed::Box<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]}::method<T, U>()
+fn impl_Trait_Option_for_Box_Global::method<T, U>()
 where
     TraitClause0: (T: Sized),
     TraitClause1: (U: Sized),
@@ -77,18 +77,18 @@ where
 }
 
 // Full name: test_crate::{impl Trait<Option<T>[TraitClause0]> for alloc::boxed::Box<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]}
-impl<T> Trait<Option<T>[TraitClause0]> for alloc::boxed::Box<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]
+impl<T> "impl_Trait_Option_for_Box_Global" Trait<Option<T>[TraitClause0]> for alloc::boxed::Box<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]
 where
     TraitClause0: (T: Sized),
 {
     proof ImpliedClause0: (alloc::boxed::Box<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]: MetaSized) = {built_in impl MetaSized for alloc::boxed::Box<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]}
     proof ImpliedClause1: (Option<T>[TraitClause0]: Sized) = {built_in impl Sized for Option<T>[TraitClause0]}
-    fn method<U, TraitClause0_1: (U: Sized)> = {impl Trait<Option<T>[TraitClause0]> for alloc::boxed::Box<T>[TraitClause0::ImpliedClause0, {built_in impl Sized for Global}]}::method<T, U>[TraitClause0, TraitClause0_1]
+    fn method<U, TraitClause0_1: (U: Sized)> = impl_Trait_Option_for_Box_Global::method<T, U>[TraitClause0, TraitClause0_1]
     non-dyn-compatible
 }
 
 // Full name: test_crate::{impl Trait<T> for [T]}::method
-fn {impl Trait<T> for [T]}::method<T, U>()
+fn impl_Trait_for_slice::method<T, U>()
 where
     TraitClause0: (T: Sized),
     TraitClause1: (U: Sized),
@@ -101,13 +101,13 @@ where
 }
 
 // Full name: test_crate::{impl Trait<T> for [T]}
-impl<T> Trait<T> for [T]
+impl<T> "impl_Trait_for_slice" Trait<T> for [T]
 where
     TraitClause0: (T: Sized),
 {
     proof ImpliedClause0: ([T]: MetaSized) = {built_in impl MetaSized for [T]}
     proof ImpliedClause1: (T: Sized) = TraitClause0
-    fn method<U, TraitClause0_1: (U: Sized)> = {impl Trait<T> for [T]}::method<T, U>[TraitClause0, TraitClause0_1]
+    fn method<U, TraitClause0_1: (U: Sized)> = impl_Trait_for_slice::method<T, U>[TraitClause0, TraitClause0_1]
     non-dyn-compatible
 }
 
@@ -155,9 +155,9 @@ where
     storage_live(_2)
     _2 = move value_1
     _0 = Generic { value: move _2 }
-    conditional_drop[{built_in impl Destruct for T}::drop_in_place] _2
+    conditional_drop[{built_in impl Destruct for T}::drop_glue<'0>] _2
     storage_dead(_2)
-    conditional_drop[{built_in impl Destruct for T}::drop_in_place] value_1
+    conditional_drop[{built_in impl Destruct for T}::drop_glue<'1>] value_1
     return
 }
 
@@ -188,7 +188,7 @@ fn use_generic()
 
     _0 = ()
     storage_live(_int_generic_1)
-    _int_generic_1 = new<i32>[{built_in impl Sized for i32}](const 42 : i32)
+    _int_generic_1 = new<i32>[{built_in impl Sized for i32}](const 42i32)
     storage_live(_str_generic_2)
     _str_generic_2 = new<&'14 str>[{built_in impl Sized for &'14 str}](const "hello")
     storage_live(_3)

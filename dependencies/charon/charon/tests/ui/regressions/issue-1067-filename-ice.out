@@ -49,13 +49,13 @@ where
 pub opaque type std::io::error::Error
 
 // Full name: std::io::error::{impl Debug for std::io::error::Error}::fmt
-pub fn {impl Debug for std::io::error::Error}::fmt<'_0, '_1, '_2>(_1: &'_0 std::io::error::Error, _2: &'_1 mut Formatter<'_2>) -> Result<(), core::fmt::Error>[{built_in impl Sized for ()}, {built_in impl Sized for core::fmt::Error}]
+pub fn impl_Debug_for_Error::fmt<'_0, '_1, '_2>(_1: &'_0 std::io::error::Error, _2: &'_1 mut Formatter<'_2>) -> Result<(), core::fmt::Error>[{built_in impl Sized for ()}, {built_in impl Sized for core::fmt::Error}]
 = <opaque>
 
 // Full name: std::io::error::{impl Debug for std::io::error::Error}
-impl Debug for std::io::error::Error {
-    fn fmt<'_0_1, '_1_1, '_2_1> = {impl Debug for std::io::error::Error}::fmt<'_0_1, '_1_1, '_2_1>
-    vtable: {impl Debug for std::io::error::Error}::{vtable}
+impl "impl_Debug_for_Error" Debug for std::io::error::Error {
+    fn fmt<'_0_1, '_1_1, '_2_1> = impl_Debug_for_Error::fmt<'_0_1, '_1_1, '_2_1>
+    vtable: impl_Debug_for_Error::{vtable}
 }
 
 // Full name: alloc::vec::Vec
@@ -66,7 +66,7 @@ where
     TraitClause1: (type_error("removed allocator parameter"): Sized),
 
 // Full name: std::io::impls::{impl Write for Vec<u8>[{built_in impl Sized for u8}, TraitClause0]}::write_all
-pub fn {impl Write for Vec<u8>[{built_in impl Sized for u8}, TraitClause0]}::write_all<'_0, '_1, A>(_1: &'_0 mut Vec<u8>[{built_in impl Sized for u8}, TraitClause0], _2: &'_1 [u8]) -> Result<(), std::io::error::Error>[{built_in impl Sized for ()}, {built_in impl Sized for std::io::error::Error}]
+pub fn impl_Write_for_Vec_u8::write_all<'_0, '_1, A>(_1: &'_0 mut Vec<u8>[{built_in impl Sized for u8}, TraitClause0], _2: &'_1 [u8]) -> Result<(), std::io::error::Error>[{built_in impl Sized for ()}, {built_in impl Sized for std::io::error::Error}]
 where
     TraitClause0: (A: Sized),
 = <opaque>
@@ -75,8 +75,8 @@ where
 #[lang_item("global_alloc_ty")]
 pub struct Global {}
 
-// Full name: alloc::vec::Vec::{impl Destruct for Vec<T>[TraitClause0, TraitClause1]}::drop_in_place
-unsafe fn {impl Destruct for Vec<T>[TraitClause0, TraitClause1]}::drop_in_place<T, A>(_1: *mut Vec<T>[TraitClause0, TraitClause1])
+// Full name: alloc::vec::Vec::{impl Destruct for Vec<T>[TraitClause0, TraitClause1]}::drop_glue
+unsafe fn impl_Destruct_for_Vec::drop_glue<'_0, T, A>(_1: &'_0 mut Vec<T>[TraitClause0, TraitClause1])
 where
     TraitClause0: (T: Sized),
     TraitClause1: (A: Sized),
@@ -98,10 +98,10 @@ fn main()
     let _3: Result<(), std::io::error::Error>[{built_in impl Sized for ()}, {built_in impl Sized for std::io::error::Error}]; // anonymous local
     let _4: &'1 mut Vec<u8>[{built_in impl Sized for u8}, {built_in impl Sized for Global}]; // anonymous local
     let _5: &'3 [u8]; // anonymous local
-    let _6: &'5 [u8; 5 : usize]; // anonymous local
-    let _7: &'6 [u8; 5 : usize]; // anonymous local
-    let _8: [u8; 5 : usize]; // anonymous local
-    let _9: &'7 [u8; 5 : usize]; // anonymous local
+    let _6: &'5 [u8; 5usize]; // anonymous local
+    let _7: &'6 [u8; 5usize]; // anonymous local
+    let _8: [u8; 5usize]; // anonymous local
+    let _9: &'7 [u8; 5usize]; // anonymous local
 
     _0 = ()
     storage_live(buf_1)
@@ -114,22 +114,22 @@ fn main()
     storage_live(_6)
     storage_live(_7)
     storage_live(_8)
-    _8 = [const 104 : u8, const 101 : u8, const 108 : u8, const 108 : u8, const 111 : u8]
+    _8 = [const 104u8, const 101u8, const 108u8, const 108u8, const 111u8]
     storage_live(_9)
     _9 = &_8
     _7 = move _9
     _6 = &(*_7)
-    _5 = @ArrayToSliceShared<'_, u8, 5 : usize>(move _6)
+    _5 = @ArrayToSliceShared<'_, u8, 5usize>(move _6)
     storage_dead(_6)
-    _3 = {impl Write for Vec<u8>[{built_in impl Sized for u8}, TraitClause0]}::write_all<'11, '12, Global>[{built_in impl Sized for Global}](move _4, move _5)
+    _3 = impl_Write_for_Vec_u8::write_all<'11, '12, Global>[{built_in impl Sized for Global}](move _4, move _5)
     storage_dead(_5)
     storage_dead(_4)
-    _2 = unwrap<(), std::io::error::Error>[{built_in impl Sized for ()}, {built_in impl Sized for std::io::error::Error}, {impl Debug for std::io::error::Error}](move _3)
+    _2 = unwrap<(), std::io::error::Error>[{built_in impl Sized for ()}, {built_in impl Sized for std::io::error::Error}, impl_Debug_for_Error](move _3)
     storage_dead(_3)
     storage_dead(_7)
     storage_dead(_2)
     _0 = ()
-    conditional_drop[{impl Destruct for Vec<T>[TraitClause0, TraitClause1]}::drop_in_place<u8, Global>[{built_in impl Sized for u8}, {built_in impl Sized for Global}]] buf_1
+    conditional_drop[impl_Destruct_for_Vec::drop_glue<'15, u8, Global>[{built_in impl Sized for u8}, {built_in impl Sized for Global}]] buf_1
     storage_dead(buf_1)
     return
 }

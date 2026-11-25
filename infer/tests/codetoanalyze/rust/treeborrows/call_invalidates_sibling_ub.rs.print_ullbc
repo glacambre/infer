@@ -8,7 +8,7 @@ fn write<'_0>(a_1: &'_0 mut i32)
 
     bb0: {
         _0 = ();
-        (*a_1) = const 1 : i32;
+        (*a_1) = const 1i32;
         _0 = ();
         return;
     }
@@ -31,7 +31,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(v_1);
-        v_1 = const 0 : i32;
+        v_1 = const 0i32;
         storage_live(p_2);
         storage_live(_3);
         _3 = &mut v_1;
@@ -60,7 +60,7 @@ fn main()
     bb2: {
         storage_dead(_9);
         storage_dead(_8);
-        (*r_6) = const 5 : i32;
+        (*r_6) = const 5i32;
         _0 = ();
         storage_dead(r_6);
         storage_dead(q_4);

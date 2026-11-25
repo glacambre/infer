@@ -107,14 +107,17 @@ impl<'tcx> PredicateSearcher<'tcx> {
         if assoc_item_resolution == AssocItemResolution::ImplItem
             && let Some((tinfo, _)) = &trait_info
             && let TraitProofKind::Concrete(impl_item_ref) = &tinfo.kind
-            && let Some(implemented_item) = tcx
+        {
+            let implemented_item = tcx
                 .associated_items(impl_item_ref.def_id)
                 .in_definition_order()
-                .find(|item| item.trait_item_def_id() == Some(def_id))
-        {
-            let trait_def_id = tcx.parent(def_id);
-            def_id = implemented_item.def_id;
-            generics = generics.rebase_onto(tcx, trait_def_id, impl_item_ref.generics());
+                .find(|item| item.trait_item_def_id() == Some(def_id));
+            // If the item is implemented, point to it; otherwise the item has a default and we're
+            // already pointing to it.
+            if let Some(implemented_item) = implemented_item {
+                def_id = implemented_item.def_id;
+                generics = generics.rebase_onto(tcx, tinfo.pred.def_id(), impl_item_ref.generics());
+            }
             trait_info = None;
         }
 

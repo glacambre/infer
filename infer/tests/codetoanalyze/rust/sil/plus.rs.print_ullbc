@@ -15,9 +15,9 @@ fn main()
         storage_live(_6);
         _0 = ();
         storage_live(a_1);
-        a_1 = const -7 : i32;
+        a_1 = const -7i32;
         storage_live(b_2);
-        b_2 = const 3 : i32;
+        b_2 = const 3i32;
         storage_live(ab_3);
         storage_live(_4);
         _4 = copy a_1;

@@ -35,12 +35,7 @@ pub struct CliOpts {
     #[serde(default)]
     pub ullbc: bool,
     /// Whether to precisely translate drops and drop-related code. For this, we add explicit
-    /// `Destruct` bounds to all generic parameters, set the MIR level to at least `elaborated`,
-    /// and attempt to retrieve drop glue for all types.
-    ///
-    /// This option is known to cause panics inside rustc, because their drop handling is not
-    /// design to work on polymorphic types. To silence the warning, pass appropriate `--opaque
-    /// '{impl core::marker::Destruct for some::Type}'` options.
+    /// `Destruct` bounds to all generic parameters and set the MIR level to at least `elaborated`.
     ///
     /// Without this option, drops may be "conditional" and we may lack information about what code
     /// is run on drop in a given polymorphic function body.
@@ -158,6 +153,12 @@ pub struct CliOpts {
     #[clap(long)]
     #[serde(default)]
     pub translate_all_methods: bool,
+    /// Whenever an impl doesn't implement a method (because it has a default body), this creates a
+    /// duplicate method as if it had been implemented. This can simplify the call-graphs as
+    /// otherwise calls within the default body would be indirected through trait proofs.
+    #[clap(long)]
+    #[serde(default)]
+    pub duplicate_defaulted_methods: bool,
 
     /// Transform the associate types of traits to be type parameters instead. This takes a list
     /// of name patterns of the traits to transform, using the same syntax as `--include`.
@@ -187,7 +188,7 @@ pub struct CliOpts {
     #[serde(default)]
     pub remove_unused_self_clauses: bool,
 
-    /// Transform precise drops to the equivalent `drop_in_place(&raw mut p)` call.
+    /// Transform precise drops to the equivalent `drop_glue(&mut p)` call.
     #[clap(long)]
     #[serde(default)]
     pub desugar_drops: bool,
@@ -399,6 +400,7 @@ impl CliOpts {
                     self.reconstruct_fallible_operations = true;
                     self.reconstruct_asserts = true;
                     self.unbind_item_vars = true;
+                    self.duplicate_defaulted_methods = true;
                 }
                 Preset::RawMir => {
                     self.extract_opaque_bodies = true;
@@ -424,6 +426,7 @@ impl CliOpts {
                     self.remove_unused_self_clauses = true;
                     self.remove_adt_clauses = true;
                     self.unbind_item_vars = true;
+                    self.duplicate_defaulted_methods = true;
                 }
                 Preset::Eurydice => {
                     self.hide_allocator = true;
@@ -434,13 +437,18 @@ impl CliOpts {
                     self.reconstruct_asserts = true;
                     self.lift_associated_types.push("*".to_owned());
                     self.unbind_item_vars = true;
+                    self.duplicate_defaulted_methods = true;
                     // Eurydice doesn't support opaque vtables it seems?
                     self.include.push("core::marker::MetaSized".to_owned());
                 }
                 Preset::Soteria => {
+                    self.desugar_drops = true;
                     self.extract_opaque_bodies = true;
-                    self.monomorphize = true;
                     self.mir = Some(MirLevel::Elaborated);
+                    self.monomorphize = true;
+                    self.no_normalize = true;
+                    self.precise_drops = true;
+                    self.raw_consts = true;
                     self.ullbc = true;
                 }
                 Preset::Tests => {
@@ -451,6 +459,7 @@ impl CliOpts {
                     self.reconstruct_asserts = true;
                     self.ops_to_function_calls = true;
                     self.index_to_function_calls = true;
+                    self.duplicate_defaulted_methods = true;
                     self.rustc_args.push("--edition=2021".to_owned());
                     self.rustc_args
                         .push("-Zcrate-attr=feature(register_tool)".to_owned());
@@ -565,6 +574,8 @@ pub struct TranslateOptions {
     /// Usually we skip the provided methods that aren't used. When this flag is on, we translate
     /// them all.
     pub translate_all_methods: bool,
+    /// Duplicate trait default methods into impls that use them.
+    pub duplicate_defaulted_methods: bool,
     /// If `Some(_)`, run the partial mutability monomorphization pass. The contained enum
     /// indicates whether to partially monomorphize types.
     pub monomorphize_mut: Option<MonomorphizeMut>,
@@ -612,12 +623,10 @@ pub struct TranslateOptions {
     pub no_typecheck: bool,
     /// Don't normalize associated types.
     pub no_normalize: bool,
-    /// Transform Drop to Call drop_in_place
+    /// Transform Drop to Call drop_glue
     pub desugar_drops: bool,
     /// Add `Destruct` bounds to all generic params.
     pub add_destruct_bounds: bool,
-    /// Translate drop glue for poly types, knowing that this may cause ICEs.
-    pub translate_poly_drop_glue: bool,
 }
 
 impl TranslateOptions {
@@ -758,11 +767,11 @@ impl TranslateOptions {
             lift_associated_types,
             unbind_item_vars: options.unbind_item_vars,
             translate_all_methods: options.translate_all_methods,
+            duplicate_defaulted_methods: options.duplicate_defaulted_methods,
             no_typecheck: options.no_typecheck,
             no_normalize: options.no_normalize,
             desugar_drops: options.desugar_drops,
             add_destruct_bounds: options.precise_drops,
-            translate_poly_drop_glue: options.precise_drops,
         }
     }
 

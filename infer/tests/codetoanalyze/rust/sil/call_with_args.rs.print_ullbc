@@ -21,7 +21,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = id(const 10 : i32) -> bb2 (unwind: bb1);
+        x_1 = id(const 10i32) -> bb2 (unwind: bb1);
     }
 
     bb1: {

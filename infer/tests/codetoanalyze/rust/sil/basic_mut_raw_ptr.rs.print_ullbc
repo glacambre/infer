@@ -11,7 +11,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(y_1);
-        y_1 = const 10 : i32;
+        y_1 = const 10i32;
         storage_live(x_2);
         storage_live(_3);
         _3 = &mut y_1;

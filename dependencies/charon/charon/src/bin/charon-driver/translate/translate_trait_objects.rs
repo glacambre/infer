@@ -289,7 +289,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
 
     fn prepare_vtable_fields(
         &mut self,
-        trait_def: &hax::FullDef<'tcx>,
+        poly_trait_def: &hax::FullDef<'tcx>,
         trait_id: TraitDeclId,
         implied_predicates: &hax::GenericPredicates,
     ) -> Result<VTableData, Error> {
@@ -305,17 +305,16 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         fields.push(TrVTableField::Drop);
 
         // Method fields.
-        if let hax::FullDefKind::Trait { items, .. } = trait_def.kind() {
+        if let hax::FullDefKind::Trait { items, .. } = poly_trait_def.kind() {
             for item in items {
                 let item_def_id = &item.def_id;
                 // This is ok because dyn-compatible methods don't have generics.
-                let item_def =
-                    self.hax_def(&trait_def.this().with_def_id(self.hax_state(), item_def_id))?;
+                let poly_item_def = self.poly_hax_def(item_def_id)?;
                 if let hax::FullDefKind::AssocFn {
                     sig,
                     vtable_sig: Some(_),
                     ..
-                } = item_def.kind()
+                } = poly_item_def.kind()
                 {
                     let id = self.translate_trait_method_id_no_enqueue(trait_id, item_def_id)?;
                     fields.push(TrVTableField::Method(id, sig.clone()));
@@ -383,9 +382,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
                     } else {
                         let self_ty =
                             TyKind::TypeVar(DeBruijnVar::new_at_zero(TypeVarId::ZERO)).into_ty();
-                        let drop_ty = Ty::new(TyKind::FnPtr(RegionBinder::empty(
-                            self.drop_in_place_method_sig(self_ty),
-                        )));
+                        let drop_ty = Ty::new(TyKind::FnPtr(self.drop_glue_fn_ptr_sig(self_ty)));
                         ("drop".into(), drop_ty)
                     }
                 }
@@ -732,7 +729,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
     /// global {impl Trait for Foo}::vtable<Args..>: Trait::{vtable}<TraitArgs.., AssocTys..> {
     ///     size: size_of(Foo),
     ///     align: align_of(Foo),
-    ///     drop: <Foo as Destruct>::drop_in_place,
+    ///     drop: <Foo as Destruct>::drop_glue,
     ///     method_0: <Foo as Trait>::method_0::{shim},
     ///     method_1: <Foo as Trait>::method_1::{shim},
     ///     ...
@@ -808,10 +805,12 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
                     // and restore the orginal one after computing `method_ty`.
                     assert!(self.binding_levels.len() == 1);
                     let orginal_binding = self.binding_levels.pop();
-                    let def = self.poly_hax_def(&item_ref.def_id)?;
-                    self.translate_item_generics(span, &def, &TransItemSourceKind::VTableMethod)?;
-
                     let assoc_fun_def = self.hax_def(item_ref)?;
+                    self.translate_item_generics(
+                        span,
+                        &assoc_fun_def,
+                        &TransItemSourceKind::VTableMethod,
+                    )?;
                     let vtable_sig = match assoc_fun_def.kind() {
                         hax::FullDefKind::AssocFn {
                             vtable_sig: Some(vtable_sig),
@@ -838,7 +837,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
 
                     VtableMethodValue::Cast((method_name.to_string(), method_ty, shim_ref))
                 } else {
-                    VtableMethodValue::Const(ConstantExprKind::FnDef(shim_ref))
+                    VtableMethodValue::Const(ConstantExprKind::FnPtr(shim_ref))
                 }
             }
             None => VtableMethodValue::Const(ConstantExprKind::Opaque(
@@ -892,7 +891,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
         let ret_ty = Ty::new(TyKind::Adt(vtable_struct_ref.clone()));
         let ret_place = builder.new_var(Some("ret".into()), ret_ty.clone());
 
-        let vtable_data = self.prepare_vtable_fields(&trait_def, trait_id, implied_preds)?;
+        let vtable_data = self.prepare_vtable_fields(&poly_trait_def, trait_id, implied_preds)?;
         // Retrieve the expected field types from the struct definition. This avoids complicated
         // substitutions.
         let field_tys = {
@@ -953,7 +952,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
                 let method_local = builder.new_var(Some(method_name.clone()), method_ty.clone());
                 let shim = Rvalue::Use(
                     Operand::Const(Box::new(ConstantExpr {
-                        kind: ConstantExprKind::FnDef(method_shim.clone()),
+                        kind: ConstantExprKind::FnPtr(method_shim.clone()),
                         ty: method_ty.clone(),
                     })),
                     WithRetag::No,
@@ -1021,7 +1020,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
 
                         mk_cast(("drop".to_string(), drop_ty.clone(), drop_shim))
                     } else {
-                        mk_const(ConstantExprKind::FnDef(drop_shim))
+                        mk_const(ConstantExprKind::FnPtr(drop_shim))
                     }
                 }
                 TrVTableField::Method(..) => 'a: {
@@ -1212,7 +1211,7 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
 
         let rustc_trait_args = trait_pred.trait_ref.rustc_args(self.hax_state_with_id());
         let rustc_self_ty = rustc_trait_args[0].as_type().unwrap();
-        let fn_ptr = self.translate_drop_in_place_method_call(span, rustc_self_ty)?;
+        let fn_ptr = self.translate_drop_glue_method_call(span, rustc_self_ty)?;
 
         // Drop(*target_self)
         let drop_arg = target_self.clone().deref();
@@ -1242,20 +1241,27 @@ impl<'tcx> ItemTransCtx<'tcx, '_> {
             );
         };
 
-        let dyn_self = self.translate_ty(span, dyn_self)?;
-        // `*mut dyn Trait -> ()`
-        let signature = self.drop_in_place_method_sig(dyn_self.clone());
+        let borrow_region = self.drop_glue_region();
 
-        // `*mut T` for `impl Trait for T`
-        let target_self_ptr = {
+        let dyn_self = self.translate_ty(span, dyn_self)?;
+        // `&mut dyn Trait -> ()`
+        let signature = self.drop_glue_method_sig(dyn_self.clone(), borrow_region);
+
+        // `&mut T` for `impl Trait for T`
+        let target_self_ref = {
             let impl_trait = self.translate_trait_ref(span, &trait_pred.trait_ref)?;
-            TyKind::RawPtr(impl_trait.generics.types[0].clone(), RefKind::Mut).into_ty()
+            TyKind::Ref(
+                borrow_region,
+                impl_trait.generics.types[0].clone(),
+                RefKind::Mut,
+            )
+            .into_ty()
         };
 
         let body: Body = self.translate_vtable_drop_shim_body(
             span,
             &signature.inputs[0],
-            &target_self_ptr,
+            &target_self_ref,
             trait_pred,
         )?;
 

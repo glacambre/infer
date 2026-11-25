@@ -29,7 +29,7 @@ pub fn goto_with_continue(x_1: i32, y_2: i32) -> i32
     bb2: {
         storage_dead(_5);
         storage_dead(_4);
-        _6 = copy x_1 panic.+ const 1 : i32;
+        _6 = copy x_1 panic.+ const 1i32;
         x_1 = move _6;
         storage_dead(_3);
         goto bb1;
@@ -57,9 +57,9 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = const 0 : i32;
+        x_1 = const 0i32;
         storage_live(y_2);
-        y_2 = const 1 : i32;
+        y_2 = const 1i32;
         storage_live(_3);
         storage_live(_4);
         _4 = copy x_1;

@@ -64,11 +64,11 @@ let pp_big_int (fmt : Format.formatter) (bi : big_int) : unit =
   pp_string fmt (Z.to_string bi)
 
 let pp_scalar_value (fmt : Format.formatter) (sv : scalar_value) : unit =
-  Format.fprintf fmt "%a : %a" pp_big_int (Scalars.get_val sv) pp_integer_type
+  Format.fprintf fmt "%a%a" pp_big_int (Scalars.get_val sv) pp_integer_type
     (Scalars.get_ty sv)
 
 let pp_float_value (fmt : Format.formatter) (fv : float_value) : unit =
-  Format.fprintf fmt "%s : %a" fv.float_value pp_float_type fv.float_ty
+  Format.fprintf fmt "%s%a" fv.float_value pp_float_type fv.float_ty
 
 let escape_string (s : string) : string =
   let buf = Buffer.create (String.length s) in
@@ -504,6 +504,7 @@ and pp_constant_expr (env : fmt_env) (fmt : Format.formatter)
       Format.fprintf fmt "&vtable_of(%a)" (pp_trait_ref env) trait_ref
   | CFnDef fn_ptr -> pp_fn_ptr env fmt fn_ptr
   | CFnPtr fn_ptr -> Format.fprintf fmt "fnptr(%a)" (pp_fn_ptr env) fn_ptr
+  | CTypeId ty -> Format.fprintf fmt "TypeId(%a)" (pp_ty env) ty
   | CRawMemory bytes ->
       Format.fprintf fmt "RawMemory(%a)" (pp_sep_list ", " (pp_byte env)) bytes
   | COpaque reason -> Format.fprintf fmt "Opaque(%s)" reason
@@ -864,6 +865,12 @@ and pp_path_elem (env : fmt_env) (fmt : Format.formatter) (e : path_elem) : unit
       pp_string fmt s;
       if d <> Disambiguator.zero then
         Format.fprintf fmt "#%s" (Disambiguator.to_string d)
+  | PeImpl (ImplElemTrait impl_id) -> begin
+      match trait_impl_short_name env impl_id with
+      | Some short_name -> pp_string fmt short_name
+      | None ->
+          Format.fprintf fmt "{%a}" (pp_impl_elem env) (ImplElemTrait impl_id)
+    end
   | PeImpl impl -> Format.fprintf fmt "{%a}" (pp_impl_elem env) impl
   | PeInstantiated binder ->
       let anon_params =
@@ -896,6 +903,23 @@ and pp_name (env : fmt_env) (fmt : Format.formatter) (n : name) : unit =
   pp_sep_list "::" (pp_path_elem env) fmt n
 
 and name_to_string env n = pp_to_string (fun fmt -> pp_name env fmt n)
+
+and pp_full_path_elem (env : fmt_env) (fmt : Format.formatter) (e : path_elem) :
+    unit =
+  match e with
+  | PeImpl impl -> Format.fprintf fmt "{%a}" (pp_impl_elem env) impl
+  | _ -> pp_path_elem env fmt e
+
+and pp_full_name (env : fmt_env) (fmt : Format.formatter) (n : name) : unit =
+  let env = { env with generics = [] } in
+  pp_sep_list "::" (pp_full_path_elem env) fmt n
+
+and full_name_to_string env n = pp_to_string (fun fmt -> pp_full_name env fmt n)
+
+and trait_impl_short_name (env : fmt_env) (id : trait_impl_id) : string option =
+  match has_short_name env (IdTraitImpl id) with
+  | Some (PeIdent _ :: _ as name) -> Some (name_to_string env name)
+  | _ -> None
 
 and pp_raw_attribute (fmt : Format.formatter) (attr : raw_attribute) : unit =
   pp_string fmt attr.path;
@@ -1068,7 +1092,7 @@ let generic_params_to_string_single_line env generics =
 
 let pp_item_intro (env : fmt_env) (indent : string) (keyword : string)
     (id : item_id) (fmt : Format.formatter) (meta : item_meta) : unit =
-  let full_name = name_to_string env meta.name in
+  let full_name = full_name_to_string env meta.name in
   let name, full_name_comment =
     match has_short_name env id with
     | Some short_name ->
@@ -1613,7 +1637,7 @@ let pp_trait_decl (env : fmt_env) (indent : string) (indent_incr : string)
 let pp_trait_impl (env : fmt_env) (indent : string) (indent_incr : string)
     (fmt : Format.formatter) (def : trait_impl) : unit =
   Format.fprintf fmt "%s// Full name: %s\n" indent
-    (name_to_string env def.item_meta.name);
+    (full_name_to_string env def.item_meta.name);
   let env = fmt_env_replace_generics_and_preds env def.generics in
   let params, clauses =
     predicates_and_trait_clauses_to_string env indent indent_incr def.generics
@@ -1621,9 +1645,14 @@ let pp_trait_impl (env : fmt_env) (indent : string) (indent_incr : string)
   let params =
     if params = [] then "" else "<" ^ String.concat ", " params ^ ">"
   in
+  let short_name =
+    match trait_impl_short_name env def.def_id with
+    | Some short_name -> " \"" ^ short_name ^ "\""
+    | None -> ""
+  in
   let indent1 = indent ^ indent_incr in
   let trait_id = def.impl_trait.id in
-  Format.fprintf fmt "%simpl%s %a%s" indent params
+  Format.fprintf fmt "%simpl%s%s %a%s" indent params short_name
     (pp_trait_decl_ref_as_impl env)
     def.impl_trait clauses;
   pp_string fmt (if clauses = "" then " {" else "\n{");

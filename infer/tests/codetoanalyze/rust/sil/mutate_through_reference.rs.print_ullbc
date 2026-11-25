@@ -10,10 +10,10 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = const 10 : i32;
+        x_1 = const 10i32;
         storage_live(ptr_2);
         ptr_2 = &mut x_1;
-        (*ptr_2) = const 20 : i32;
+        (*ptr_2) = const 20i32;
         _0 = ();
         storage_dead(ptr_2);
         storage_dead(x_1);

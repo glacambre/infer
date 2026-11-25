@@ -9,7 +9,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = const 42 : i32;
+        x_1 = const 42i32;
         _0 = ();
         storage_dead(x_1);
         return;

@@ -28,9 +28,9 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(a_1);
-        a_1 = const 5 : i32;
+        a_1 = const 5i32;
         storage_live(b_2);
-        b_2 = const 3 : i32;
+        b_2 = const 3i32;
         storage_live(_3);
         storage_live(_4);
         _4 = copy a_1;

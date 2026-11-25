@@ -19,7 +19,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(p_1);
-        p_1 = Point { x: const 1 : i32, y: const 2 : i32 };
+        p_1 = Point { x: const 1i32, y: const 2i32 };
         storage_live(one_2);
         one_2 = copy (p_1).x;
         storage_live(two_3);

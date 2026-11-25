@@ -14,20 +14,20 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(_1);
-        _1 = const 10 : u8 & const 12 : u8;
+        _1 = const 10u8 & const 12u8;
         storage_dead(_1);
         storage_live(_2);
-        _2 = const 10 : u8 | const 5 : u8;
+        _2 = const 10u8 | const 5u8;
         storage_dead(_2);
         storage_live(_3);
-        _3 = const 15 : u8 ^ const 5 : u8;
+        _3 = const 15u8 ^ const 5u8;
         storage_dead(_3);
         storage_live(a_4);
-        a_4 = const -1 : i8;
+        a_4 = const -1i8;
         storage_live(_5);
         storage_live(_6);
         _6 = copy a_4;
-        _5 = move _6 & const 15 : i8;
+        _5 = move _6 & const 15i8;
         storage_dead(_6);
         storage_dead(_5);
         _0 = ();

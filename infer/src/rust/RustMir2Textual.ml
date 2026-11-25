@@ -107,16 +107,16 @@ let mk_typename_from_type_decl crate (type_decl : Charon.Generated_Types.type_de
 
 
 (* Model for box drops when using --desugar-drops *)
-let is_box_primitive_drop_in_place crate fun_decl_id =
+let is_box_primitive_drop_glue crate fun_decl_id =
   let decl = fun_map_find_id crate fun_decl_id in
   match (decl.item_meta.name, decl.signature.inputs) with
   | ( PeIdent ("alloc", _)
       :: PeIdent ("boxed", _)
       :: PeIdent ("Box", _)
       :: _
-      :: PeIdent ("drop_in_place", _)
+      :: PeIdent ("drop_glue", _)
       :: _
-    , TRawPtr (TAdt {id= TBuiltin TBox; generics= {types= TLiteral _ :: _}}, _) :: _ ) ->
+    , TRef (_, TAdt {id= TBuiltin TBox; generics= {types= TLiteral _ :: _}}, RMut) :: _ ) ->
       true
   | _, _ ->
       false
@@ -126,7 +126,7 @@ let fun_name_from_fun_operand (crate : Charon.UllbcAst.crate)
     (operand : Charon.Generated_GAst.fn_operand) : Textual.QualifiedProcName.t =
   match operand with
   | FnOpRegular {kind= FunId (FRegular fun_decl_id)}
-    when is_box_primitive_drop_in_place crate fun_decl_id ->
+    when is_box_primitive_drop_glue crate fun_decl_id ->
       Textual.ProcDecl.boxdrop_name
   | FnOpRegular {kind= FunId (FRegular fun_decl_id)} ->
       let decl = fun_map_find_id crate fun_decl_id in

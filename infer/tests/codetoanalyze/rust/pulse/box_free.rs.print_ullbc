@@ -4,40 +4,29 @@
 #[lang_item("destruct")]
 pub trait Destruct<Self>
 {
-    fn drop_in_place = core::marker::Destruct::drop_in_place<Self>
+    fn drop_glue<'_0_1> = core::marker::Destruct::drop_glue<'_0_1, Self>
     non-dyn-compatible
 }
 
-unsafe fn core::marker::Destruct::drop_in_place<Self>(_1: *mut Self)
+unsafe fn core::marker::Destruct::drop_glue<'_0, Self>(_1: &'_0 mut Self)
 = <opaque>
-
-// Full name: core::ptr::non_null::NonNull
-#[lang_item("NonNull")]
-pub opaque type NonNull<T>
-where
-    TraitClause0: (T: Destruct),
-
-// Full name: core::ptr::unique::Unique
-pub opaque type Unique<T>
-where
-    TraitClause0: (T: Destruct),
 
 // Full name: alloc::alloc::Global
 #[lang_item("global_alloc_ty")]
 pub struct Global {}
 
-// Full name: alloc::alloc::Global::{impl Destruct for Global}::drop_in_place
-unsafe fn {impl Destruct for Global}::drop_in_place(_1: *mut Global)
+// Full name: alloc::alloc::Global::{impl Destruct for Global}::drop_glue
+unsafe fn impl_Destruct_for_Global::drop_glue<'_0>(_1: &'_0 mut Global)
 = <opaque>
 
 // Full name: alloc::alloc::Global::{impl Destruct for Global}
-impl Destruct for Global {
-    fn drop_in_place = {impl Destruct for Global}::drop_in_place
+impl "impl_Destruct_for_Global" Destruct for Global {
+    fn drop_glue<'_0_1> = impl_Destruct_for_Global::drop_glue<'_0_1>
     non-dyn-compatible
 }
 
-// Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place
-unsafe fn {impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place<T, A>(_1: *mut alloc::boxed::Box<T>[TraitClause0, TraitClause1])
+// Full name: alloc::boxed::Box::{impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_glue
+unsafe fn impl_Destruct_for_Box::drop_glue<'_0, T, A>(_1: &'_0 mut alloc::boxed::Box<T>[TraitClause0, TraitClause1])
 where
     TraitClause0: (T: Destruct),
     TraitClause1: (A: Destruct),
@@ -48,18 +37,16 @@ fn main()
 {
     let _0: (); // return
     let ptr_1: *const i32; // local
-    let x_2: alloc::boxed::Box<i32>[{built_in impl Destruct for i32}, {impl Destruct for Global}]; // local
+    let x_2: alloc::boxed::Box<i32>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]; // local
     let _3: *const i32; // anonymous local
     let _4: &'1 i32; // anonymous local
     let ub_5: i32; // local
-    let _6: *const i32; // anonymous local
 
     bb0: {
-        storage_live(_6);
         _0 = ();
         storage_live(ptr_1);
         storage_live(x_2);
-        x_2 = @BoxNew<i32>[{built_in impl Destruct for i32}](const 50 : i32) -> bb2 (unwind: bb1);
+        x_2 = @BoxNew<i32>[{built_in impl Destruct for i32}](const 50i32) -> bb2 (unwind: bb1);
     }
 
     bb1: {
@@ -69,14 +56,13 @@ fn main()
     bb2: {
         storage_live(_3);
         storage_live(_4);
-        _6 = transmute<NonNull<i32>[{built_in impl Destruct for i32}], *const i32>(copy ((*x_2)).0);
-        _4 = &(*_6);
+        _4 = &(*x_2);
         _3 = &raw const (*_4);
         ptr_1 = move _3;
         storage_dead(_3);
         storage_dead(_4);
         // Box is freed here since borrowchecker does not keep track of raw pointer
-        drop[{impl Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place<i32, Global>[{built_in impl Destruct for i32}, {impl Destruct for Global}]] x_2 -> bb3 (unwind: bb4);
+        drop[impl_Destruct_for_Box::drop_glue<'2, i32, Global>[{built_in impl Destruct for i32}, impl_Destruct_for_Global]] x_2 -> bb3 (unwind: bb4);
     }
 
     bb3: {

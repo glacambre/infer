@@ -9,7 +9,7 @@ fn use_both<'_0, '_1>(a_1: &'_0 mut i32, b_2: &'_1 mut i32)
 
     bb0: {
         _0 = ();
-        (*a_1) = const 1 : i32;
+        (*a_1) = const 1i32;
         _ = (*b_2);
         _0 = ();
         return;
@@ -32,7 +32,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = const 0 : i32;
+        x_1 = const 0i32;
         storage_live(p_2);
         storage_live(_3);
         _3 = &mut x_1;

@@ -15,7 +15,7 @@ fn f<'_0>(a_1: &'_0 i32)
         _3 = &raw const (*a_1);
         p_2 = cast<*const i32, *mut i32>(move _3);
         storage_dead(_3);
-        (*p_2) = const 1 : i32;
+        (*p_2) = const 1i32;
         _0 = ();
         storage_dead(p_2);
         return;
@@ -34,7 +34,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = const 0 : i32;
+        x_1 = const 0i32;
         storage_live(_2);
         storage_live(_3);
         storage_live(_4);

@@ -11,7 +11,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = const 42 : i32;
+        x_1 = const 42i32;
         storage_live(ref_x_2);
         ref_x_2 = &x_1;
         storage_live(y_3);

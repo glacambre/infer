@@ -10,7 +10,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = const 42 : i32;
+        x_1 = const 42i32;
         storage_live(y_2);
         y_2 = copy x_1;
         _0 = ();

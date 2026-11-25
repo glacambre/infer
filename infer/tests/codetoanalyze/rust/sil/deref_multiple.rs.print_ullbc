@@ -17,7 +17,7 @@ fn main()
         storage_live(_7);
         _0 = ();
         storage_live(x_1);
-        x_1 = const 42 : i32;
+        x_1 = const 42i32;
         storage_live(ref_1_2);
         ref_1_2 = &x_1;
         storage_live(ref_2_3);

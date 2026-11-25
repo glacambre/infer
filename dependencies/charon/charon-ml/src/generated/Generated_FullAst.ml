@@ -65,14 +65,8 @@ and cli_options = {
           control-flow) *)
   precise_drops : bool;
       (** Whether to precisely translate drops and drop-related code. For this,
-          we add explicit [Destruct] bounds to all generic parameters, set the
-          MIR level to at least [elaborated], and attempt to retrieve drop glue
-          for all types.
-
-          This option is known to cause panics inside rustc, because their drop
-          handling is not design to work on polymorphic types. To silence the
-          warning, pass appropriate
-          [--opaque '{impl core::marker::Destruct for some::Type}'] options.
+          we add explicit [Destruct] bounds to all generic parameters and set
+          the MIR level to at least [elaborated].
 
           Without this option, drops may be "conditional" and we may lack
           information about what code is run on drop in a given polymorphic
@@ -128,6 +122,11 @@ and cli_options = {
   translate_all_methods : bool;
       (** Usually we skip the provided methods that aren't used. When this flag
           is on, we translate them all. *)
+  duplicate_defaulted_methods : bool;
+      (** Whenever an impl doesn't implement a method (because it has a default
+          body), this creates a duplicate method as if it had been implemented.
+          This can simplify the call-graphs as otherwise calls within the
+          default body would be indirected through trait proofs. *)
   lift_associated_types : string list;
       (** Transform the associate types of traits to be type parameters instead.
           This takes a list of name patterns of the traits to transform, using
@@ -151,8 +150,7 @@ and cli_options = {
           declarations. This flag removes [Self] clauses that aren't used to
           break this mutual recursion when possible. *)
   desugar_drops : bool;
-      (** Transform precise drops to the equivalent [drop_in_place(&raw mut p)]
-          call. *)
+      (** Transform precise drops to the equivalent [drop_glue(&mut p)] call. *)
   ops_to_function_calls : bool;
       (** Transform array-to-slice unsizing, repeat expressions, and raw pointer
           construction into builtin functions in ULLBC. *)

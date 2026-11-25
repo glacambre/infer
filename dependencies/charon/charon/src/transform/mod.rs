@@ -34,6 +34,7 @@ pub mod normalize {
 pub mod resugar {
     pub mod move_asserts_to_statements;
     pub mod reconstruct_asserts;
+    pub mod reconstruct_box_derefs;
     pub mod reconstruct_fallible_operations;
     pub mod reconstruct_intrinsics;
     pub mod reconstruct_matches;
@@ -43,6 +44,7 @@ pub mod resugar {
 /// Passes that make the output simpler/easier to consume.
 pub mod simplify_output {
     pub mod anon_const_to_call;
+    pub mod duplicate_defaulted_methods;
     pub mod filter_trivial_drops;
     pub mod hide_allocator_param;
     pub mod index_intermediate_assigns;
@@ -87,6 +89,8 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
 
     // Item and type cleanup passes.
     ctx.run_passes([
+        // `--duplicate-defaulted-methods`: copy default method bodies into impls that use them.
+        global(&simplify_output::duplicate_defaulted_methods::Transform),
         // Compute short names. We do it early to make pretty-printed output more legible in traces.
         global(&add_missing_info::compute_short_names::Transform),
         // Check that translation emitted consistent types, and unify body lifetimes (best-effort).
@@ -99,14 +103,6 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
         // Type aliases may use associated types without declaring the corresponding trait
         // such missing trait clauses.
         global(&add_missing_info::add_missing_alias_clauses::Transform),
-        // Change trait associated types to be type parameters instead. See the module for details.
-        // This also normalizes any use of an associated type that we can resolve.
-        global(&normalize::expand_associated_types::Transform),
-        // Remove the explicit `Self: Trait` clause of methods/assoc const declaration items if
-        // they're not used. This simplifies the graph of dependencies between definitions.
-        global(&simplify_output::remove_unused_self_clause::Transform),
-        // `--remove-adt-clauses`: Remove all trait clauses from type declarations.
-        global(&simplify_output::remove_adt_clauses::Transform),
     ]);
 
     // Body cleanup passes on the ullbc.
@@ -121,11 +117,11 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
         CowBox::Borrowed(&finish_translation::insert_assign_return_unit::Transform),
         // Insert `StorageLive` for locals that don't have one (that's allowed in MIR).
         CowBox::Borrowed(&finish_translation::insert_storage_lives::Transform),
-        // Transform Drops into Calls to drop_in_place.
+        // Transform Drops into Calls to drop_glue.
         CowBox::Borrowed(&normalize::desugar_drops::Transform),
         // Whenever we reference a trait method on a known type, refer to the method `FunDecl`
-        // directly instead of going via a `TraitRef`. This is done before `reorder_decls` to
-        // remove some sources of mutual recursion.
+        // directly instead of going via a `TraitRef`. This is done before associated-type lifting
+        // because it messes up generic args order.
         CowBox::Borrowed(&normalize::skip_trait_refs_when_known::Transform),
         // Transform dyn trait method calls to vtable function pointer calls.
         // This should be early to handle the calls before other transformations.
@@ -158,6 +154,8 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
         // this, it must happen before passes that insert statements like [simplify_constants].
         // This must also happen after `inline_selected_functions`, and `merge_goto_chains`.
         resugar::reconstruct_vec_boxes::Transform::new(ctx),
+        // Resugar the box derefs that got desugared in elaborated MIR.
+        CowBox::Borrowed(&resugar::reconstruct_box_derefs::Transform),
         // Recognize calls to the `offset_of` intrinsics and replace them with the
         // corresponding `NullOp`.
         CowBox::Borrowed(&resugar::reconstruct_intrinsics::Transform),
@@ -213,6 +211,14 @@ pub fn run_transformation_passes(options: &CliOpts, ctx: &mut TransformCtx) {
     }
     // Cleanup passes useful for both llbc and ullbc.
     ctx.run_passes([
+        // Change trait associated types to be type parameters instead. See the module for details.
+        // This also normalizes any use of an associated type that we can resolve.
+        global(&normalize::expand_associated_types::Transform),
+        // Remove the explicit `Self: Trait` clause of methods/assoc const declaration items if
+        // they're not used. This simplifies the graph of dependencies between definitions.
+        global(&simplify_output::remove_unused_self_clause::Transform),
+        // `--remove-adt-clauses`: Remove all trait clauses from type declarations.
+        global(&simplify_output::remove_adt_clauses::Transform),
         // Remove the locals which are never used.
         mixed_body(&simplify_output::remove_unused_locals::Transform),
         // Remove the useless `StatementKind::Nop`s.

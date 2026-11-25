@@ -40,7 +40,7 @@ use clap::Parser;
 use cli::{Charon, Cli};
 use itertools::Itertools;
 use std::{env, process::ExitStatus};
-use toolchain::toolchain_path;
+use toolchain::{toolchain_path, toolchain_version};
 
 #[macro_use]
 extern crate charon_lib;
@@ -48,6 +48,7 @@ extern crate charon_lib;
 mod cli;
 mod toml_config;
 mod toolchain;
+mod ui_test;
 
 pub fn main() -> Result<()> {
     // Initialize the logger
@@ -89,9 +90,14 @@ pub fn main() -> Result<()> {
                 })?
             }
         }
+        Charon::UiTest(args) => ui_test::run(args)?,
         Charon::ToolchainPath(_) => {
             let path = toolchain_path()?;
             println!("{}", path.display());
+            ExitStatus::default()
+        }
+        Charon::ToolchainVersion => {
+            println!("{}", toolchain_version());
             ExitStatus::default()
         }
         Charon::Version => {

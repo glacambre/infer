@@ -15,7 +15,7 @@ pub fn swi_nested(a_1: i32, b_2: i32) -> i32
         storage_live(_3);
         storage_live(_4);
         _4 = copy a_1;
-        _3 = move _4 >= const 0 : i32;
+        _3 = move _4 >= const 0i32;
         if move _3 -> bb1 else -> bb2;
     }
 
@@ -24,25 +24,25 @@ pub fn swi_nested(a_1: i32, b_2: i32) -> i32
         storage_live(_5);
         storage_live(_6);
         _6 = copy b_2;
-        _5 = move _6 == const 0 : i32;
+        _5 = move _6 == const 0i32;
         if move _5 -> bb3 else -> bb4;
     }
 
     bb2: {
         storage_dead(_4);
-        _0 = const 3 : i32;
+        _0 = const 3i32;
         goto bb5;
     }
 
     bb3: {
         storage_dead(_6);
-        _0 = const 1 : i32;
+        _0 = const 1i32;
         goto bb6;
     }
 
     bb4: {
         storage_dead(_6);
-        _0 = const 2 : i32;
+        _0 = const 2i32;
         goto bb6;
     }
 
@@ -70,9 +70,9 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = const 0 : i32;
+        x_1 = const 0i32;
         storage_live(y_2);
-        y_2 = const 1 : i32;
+        y_2 = const 1i32;
         storage_live(_3);
         storage_live(_4);
         _4 = copy x_1;

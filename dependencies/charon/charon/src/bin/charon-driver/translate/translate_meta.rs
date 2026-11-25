@@ -204,8 +204,6 @@ impl<'tcx> TranslateCtx<'tcx> {
         // Match over the key data
         let path_elem = match path_elem.data {
             DefPathItem::CrateRoot { name, .. } => {
-                // Sanity check
-                error_assert!(self, span, path_elem.disambiguator == 0);
                 Some(PathElem::Ident(name.to_string(), disambiguator))
             }
             // We map the three namespaces onto a single one. We can always disambiguate by looking
@@ -388,21 +386,14 @@ impl<'tcx> TranslateCtx<'tcx> {
                 let impl_id = self.register_and_enqueue(&None, src.clone()).unwrap();
                 name.name.push(PathElem::Impl(ImplElem::Trait(impl_id)));
             }
-            TransItemSourceKind::DefaultedMethod(_, trait_id, method_id) => {
-                let method_name = self.translated.assoc_item_name(*trait_id, *method_id);
-                name.name.push(PathElem::Ident(
-                    method_name.to_string(),
-                    Disambiguator::ZERO,
-                ));
-            }
             TransItemSourceKind::ClosureMethod(kind) => {
                 let fn_name = kind.method_name().to_string();
                 name.name
                     .push(PathElem::Ident(fn_name, Disambiguator::ZERO));
             }
-            TransItemSourceKind::DropInPlaceMethod(..) => {
+            TransItemSourceKind::DropGlueMethod(..) => {
                 name.name.push(PathElem::Ident(
-                    "drop_in_place".to_string(),
+                    "drop_glue".to_string(),
                     Disambiguator::ZERO,
                 ));
             }
@@ -445,7 +436,8 @@ impl<'tcx> TranslateCtx<'tcx> {
             let span = self.def_span(&item_ref.def_id);
             let mut bt_ctx = ItemTransCtx::new(src.clone(), trans_id, self);
             let binder = bt_ctx.inside_binder(BinderKind::Other, |bt_ctx| {
-                bt_ctx.translate_generic_args(span, &item_ref.generic_args, &item_ref.trait_proofs)
+                // We skip the clauses: the args are enough to uniquely identify an ite.
+                bt_ctx.translate_generic_args(span, &item_ref.generic_args, &[])
             })?;
             if !binder.skip_binder.is_empty() {
                 name.name.push(PathElem::Instantiated(Box::new(binder)));

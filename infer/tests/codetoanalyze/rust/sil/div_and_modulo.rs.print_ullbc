@@ -32,9 +32,9 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(a_1);
-        a_1 = const 7 : u32;
+        a_1 = const 7u32;
         storage_live(b_2);
-        b_2 = const 3 : u32;
+        b_2 = const 3u32;
         storage_live(_3);
         storage_live(_4);
         _4 = copy a_1;
@@ -54,9 +54,9 @@ fn main()
         storage_dead(_7);
         storage_dead(_6);
         storage_live(c_9);
-        c_9 = const 7 : i32;
+        c_9 = const 7i32;
         storage_live(d_10);
-        d_10 = const -3 : i32;
+        d_10 = const -3i32;
         storage_live(_11);
         storage_live(_12);
         _12 = copy c_9;
@@ -76,9 +76,9 @@ fn main()
         storage_dead(_15);
         storage_dead(_14);
         storage_live(e_17);
-        e_17 = const -7 : i32;
+        e_17 = const -7i32;
         storage_live(f_18);
-        f_18 = const 3 : i32;
+        f_18 = const 3i32;
         storage_live(_19);
         storage_live(_20);
         _20 = copy e_17;

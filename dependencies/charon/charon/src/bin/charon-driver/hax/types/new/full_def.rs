@@ -183,9 +183,7 @@ impl ItemRef {
         self.def_id.full_def_maybe_instantiated(s, Some(args))
     }
 
-    /// Get the drop glue shim for this. Panics if the `DefKind` isn't appropriate. Drop glue shims
-    /// are normally translated by hax when safe to do so (i.e. for mono types). This method can be
-    /// used if you know what you're doing and want drop glue for a poly type. This may cause ICEs.
+    /// Get the drop glue shim for this. Panics if the `DefKind` isn't appropriate.
     pub fn drop_glue_shim<'tcx, S>(&self, s: &S) -> mir::Body<'tcx>
     where
         S: BaseState<'tcx>,
@@ -1064,6 +1062,34 @@ impl<'tcx> FullDef<'tcx> {
             ty::ConstKind::Error(..) => None,
             _ => Some(c.sinto(s)),
         }
+    }
+
+    /// Evaluate the initializer of a `Static` item.
+    pub fn static_value<S>(&self, s: &S) -> Option<ConstantExpr>
+    where
+        S: BaseState<'tcx>,
+    {
+        match self.kind() {
+            FullDefKind::Static { .. } => {}
+            _ => panic!("expected a Static definition"),
+        }
+        let s = &s.with_hax_owner(self.def_id());
+        let def_id = self.def_id().as_real_def_id()?;
+        let args = self.this().rustc_args(s);
+        let ty = inst_binder(
+            s.base().tcx,
+            s.typing_env(),
+            Some(args),
+            self.def_id().type_of(s),
+        );
+        let alloc = s.base().tcx.eval_static_initializer(def_id).ok()?;
+        // `eval_static_initializer` returns an interned allocation without an `AllocId`; give it
+        // one so we can inspect it through the existing `ConstValue` path.
+        let val = mir::ConstValue::Indirect {
+            alloc_id: s.base().tcx.reserve_and_set_memory_alloc(alloc),
+            offset: rustc_abi::Size::ZERO,
+        };
+        const_value_to_constant_expr(s, ty, val, s.base().tcx.def_span(def_id)).discard_err()
     }
 
     /// Returns the generics and predicates for definitions that have those.

@@ -22,11 +22,11 @@ fn main()
         storage_live(tunit_1);
         tunit_1 = Types::Unit {  };
         storage_live(tvalue_2);
-        tvalue_2 = Types::Value { 0: const 10 : i32 };
+        tvalue_2 = Types::Value { 0: const 10i32 };
         storage_live(ttype_3);
-        ttype_3 = Types::Tuple { 0: const 20 : i32, 1: const 30 : i32 };
+        ttype_3 = Types::Tuple { 0: const 20i32, 1: const 30i32 };
         storage_live(tname_4);
-        tname_4 = Types::Named { id: const 40 : i32 };
+        tname_4 = Types::Named { id: const 40i32 };
         _0 = ();
         storage_dead(tname_4);
         storage_dead(ttype_3);

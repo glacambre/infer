@@ -43,7 +43,7 @@ fn main()
         storage_live(three_2);
         storage_live(_3);
         _3 = &adder_1;
-        three_2 = add<'3>(move _3, const 1 : i32, const 2 : i32) -> bb2 (unwind: bb1);
+        three_2 = add<'3>(move _3, const 1i32, const 2i32) -> bb2 (unwind: bb1);
     }
 
     bb1: {

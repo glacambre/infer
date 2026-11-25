@@ -19,7 +19,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(s_1);
-        s_1 = P { a: const 0 : i32, b: const 0 : i32 };
+        s_1 = P { a: const 0i32, b: const 0i32 };
         storage_live(r_2);
         storage_live(_3);
         _3 = &mut s_1;
@@ -29,8 +29,8 @@ fn main()
         fb_4 = &mut ((*r_2)).b;
         storage_live(whole_5);
         whole_5 = &mut (*r_2);
-        ((*whole_5)).a = const 7 : i32;
-        (*fb_4) = const 8 : i32;
+        ((*whole_5)).a = const 7i32;
+        (*fb_4) = const 8i32;
         _0 = ();
         storage_dead(whole_5);
         storage_dead(fb_4);

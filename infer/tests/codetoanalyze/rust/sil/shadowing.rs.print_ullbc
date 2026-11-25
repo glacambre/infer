@@ -10,9 +10,9 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = const 1 : i32;
+        x_1 = const 1i32;
         storage_live(x_2);
-        x_2 = const 2 : i32;
+        x_2 = const 2i32;
         storage_dead(x_2);
         _0 = ();
         storage_dead(x_1);

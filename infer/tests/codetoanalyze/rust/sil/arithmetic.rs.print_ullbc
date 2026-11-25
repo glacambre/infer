@@ -76,9 +76,9 @@ fn main()
         storage_live(_56);
         _0 = ();
         storage_live(a_1);
-        a_1 = const -7 : i32;
+        a_1 = const -7i32;
         storage_live(b_2);
-        b_2 = const 3 : i32;
+        b_2 = const 3i32;
         storage_live(_3);
         storage_live(_4);
         _4 = copy a_1;
@@ -110,9 +110,9 @@ fn main()
         storage_dead(_12);
         storage_dead(_11);
         storage_live(x_15);
-        x_15 = const 2 : u32;
+        x_15 = const 2u32;
         storage_live(y_16);
-        y_16 = const 5 : u32;
+        y_16 = const 5u32;
         storage_live(_17);
         storage_live(_18);
         _18 = copy x_15;
@@ -144,9 +144,9 @@ fn main()
         storage_dead(_26);
         storage_dead(_25);
         storage_live(c_29);
-        c_29 = const 1 : i128;
+        c_29 = const 1i128;
         storage_live(d_30);
-        d_30 = const 2 : i128;
+        d_30 = const 2i128;
         storage_live(_31);
         storage_live(_32);
         _32 = copy c_29;
@@ -178,9 +178,9 @@ fn main()
         storage_dead(_40);
         storage_dead(_39);
         storage_live(z_43);
-        z_43 = const 10 : u128;
+        z_43 = const 10u128;
         storage_live(w_44);
-        w_44 = const 2 : u128;
+        w_44 = const 2u128;
         storage_live(_45);
         storage_live(_46);
         _46 = copy z_43;

@@ -28,7 +28,7 @@ fn main()
     bb0: {
         _0 = ();
         storage_live(x_1);
-        x_1 = const 0 : i32;
+        x_1 = const 0i32;
         storage_live(_2);
         storage_live(_3);
         storage_live(_4);

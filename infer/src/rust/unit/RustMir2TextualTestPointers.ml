@@ -393,11 +393,11 @@ let%expect_test "box" =
 
     }
 
-    declare core::marker::Destruct::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *void) : void
+    declare core::marker::Destruct::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *void) : void
 
-    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
 
-    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" **void) : void
+    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" **void) : void
     |}]
 
 
@@ -459,11 +459,11 @@ let%expect_test "box_memoryleak" =
 
     }
 
-    declare core::marker::Destruct::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *void) : void
+    declare core::marker::Destruct::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *void) : void
 
-    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
 
-    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" **void) : void
+    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<T>[TraitClause0, TraitClause1]}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" **void) : void
     |}]
 
 
@@ -500,7 +500,7 @@ let%expect_test "box_use_after_free" =
     type core::ptr::unique::Unique::<i32> = {pointer: *void; _marker: core::marker::PhantomData::<i32>}
 
     define dummy::main() : void {
-      local var_0: void, ptr_1: .rust_mut = "const" .rust_pointer = "pointer" *int, x_2: *int, var_3: .rust_mut = "const" .rust_pointer = "pointer" *int, var_4: .rust_mut = "const" .rust_pointer = "reference" *int, ub_5: int, var_6: .rust_mut = "const" .rust_pointer = "pointer" *int
+      local var_0: void, ptr_1: .rust_mut = "const" .rust_pointer = "pointer" *int, x_2: *int, var_3: .rust_mut = "const" .rust_pointer = "pointer" *int, var_4: .rust_mut = "const" .rust_pointer = "reference" *int, ub_5: int
       #node_0:
           store &var_0 <- null:void
           n0 = __sil_boxnew(50)
@@ -512,39 +512,39 @@ let%expect_test "box_use_after_free" =
           throw "UnwindResume"
 
       #node_2:
-          n1:*void = load &x_2
-          store &var_6 <- __sil_cast(<.rust_mut = "const" .rust_pointer = "pointer" *int>, n1):.rust_mut = "const" .rust_pointer = "pointer" *int
-          n2:.rust_mut = "const" .rust_pointer = "pointer" *int = load &var_6
-          store &var_4 <- n2:.rust_mut = "const" .rust_pointer = "reference" *int
-          n3:.rust_mut = "const" .rust_pointer = "pointer" *int = load &var_6
-          n4 = __rust_retag(&var_4, n3, 0)
-          n5:.rust_mut = "const" .rust_pointer = "reference" *int = load &var_4
-          store &var_3 <- n5:.rust_mut = "const" .rust_pointer = "pointer" *int
-          n6:.rust_mut = "const" .rust_pointer = "pointer" *int = load &var_3
-          store &ptr_1 <- n6:.rust_mut = "const" .rust_pointer = "pointer" *int
-          n7:*int = load &x_2
-          n8 = __sil_free(n7)
+          n1:*int = load &x_2
+          store &var_4 <- n1:.rust_mut = "const" .rust_pointer = "reference" *int
+          n2:*int = load &x_2
+          n3 = __rust_retag(&var_4, n2, 0)
+          n4:.rust_mut = "const" .rust_pointer = "reference" *int = load &var_4
+          store &var_3 <- n4:.rust_mut = "const" .rust_pointer = "pointer" *int
+          n5:.rust_mut = "const" .rust_pointer = "pointer" *int = load &var_3
+          store &ptr_1 <- n5:.rust_mut = "const" .rust_pointer = "pointer" *int
+          n6:*int = load &x_2
+          n7 = __sil_free(n6)
           jmp node_3
           .handlers node_4
 
       #node_3:
-          n9:.rust_mut = "const" .rust_pointer = "pointer" *int = load &ptr_1
-          n10:int = load n9
-          store &ub_5 <- n10:int
+          n8:.rust_mut = "const" .rust_pointer = "pointer" *int = load &ptr_1
+          n9:int = load n8
+          store &ub_5 <- n9:int
           store &var_0 <- null:void
-          n11:void = load &var_0
-          ret n11
+          n10:void = load &var_0
+          ret n10
 
       #node_4:
           throw "UnwindResume"
 
     }
 
-    declare core::marker::Destruct::drop_in_place::<alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]>(.rust_mut = "mut" .rust_pointer = "pointer" **int) : void
+    declare core::marker::Destruct::drop_glue::<alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]>(.rust_mut = "mut" .rust_pointer = "reference" **int) : void
 
-    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_in_place(.rust_mut = "mut" .rust_pointer = "pointer" *alloc::alloc::Global) : void
+    declare core::marker::Destruct::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *void) : void
 
-    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]}::drop_in_place::<i32, alloc::alloc::Global>(.rust_mut = "mut" .rust_pointer = "pointer" **int) : void
+    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
+
+    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]}::drop_glue::<i32, alloc::alloc::Global>(.rust_mut = "mut" .rust_pointer = "reference" **int) : void
     |}]
 
 
@@ -590,4 +590,61 @@ fn main() {
           ret n6
 
     }
+    |}]
+
+
+let%expect_test "desugared box drop glue" =
+  test
+    ~args:
+      "--desugar-drops --monomorphize --start-from=crate::main --hide-marker-traits \
+       --hide-allocator"
+    {|
+fn main() {
+    let _b = Box::new(42);
+}
+|} ;
+  [%expect
+    {|
+    .source_language = "Rust"
+
+    type alloc::alloc::Global = {}
+
+    define dummy::main() : void {
+      local var_0: void, _b_1: *int, drop_arg_2: .rust_mut = "mut" .rust_pointer = "reference" **int, drop_ret_3: void
+      #node_0:
+          store &var_0 <- null:void
+          n0 = __sil_boxnew(42)
+          store &_b_1 <- n0:*int
+          jmp node_2
+          .handlers node_1
+
+      #node_1:
+          throw "UnwindResume"
+
+      #node_2:
+          store &var_0 <- null:void
+          store &drop_arg_2 <- &_b_1:.rust_mut = "mut" .rust_pointer = "reference" **int
+          n1 = __rust_retag(&drop_arg_2, &_b_1, 1)
+          n2:.rust_mut = "mut" .rust_pointer = "reference" **int = load &drop_arg_2
+          n3 = __sil_boxdrop(n2)
+          store &drop_ret_3 <- n3:void
+          jmp node_3
+          .handlers node_4
+
+      #node_3:
+          n4:void = load &var_0
+          ret n4
+
+      #node_4:
+          throw "UnwindResume"
+
+    }
+
+    declare core::marker::Destruct::drop_glue::<alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]>(.rust_mut = "mut" .rust_pointer = "reference" **int) : void
+
+    declare core::marker::Destruct::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *void) : void
+
+    declare alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}::drop_glue(.rust_mut = "mut" .rust_pointer = "reference" *alloc::alloc::Global) : void
+
+    declare alloc::boxed::Box::{impl core::marker::Destruct for alloc::boxed::Box<i32>[{built_in impl core::marker::Destruct for i32}, alloc::alloc::Global::{impl core::marker::Destruct for alloc::alloc::Global}]}::drop_glue::<i32, alloc::alloc::Global>(.rust_mut = "mut" .rust_pointer = "reference" **int) : void
     |}]
