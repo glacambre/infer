@@ -176,7 +176,7 @@ let mk_label (id : int) : Textual.NodeName.t =
 let params_from_fun_decl (fun_decl : Charon.UllbcAst.blocks Charon.GAst.gfun_decl) (arg_count : int)
     : Textual.VarName.t list =
   match fun_decl.body with
-  | Some {locals= {locals= _ :: locals_list}} ->
+  | Body {locals= {locals= _ :: locals_list}} ->
       List.take locals_list arg_count
       |> List.mapi ~f:(fun i (local : Charon.Generated_GAst.local) -> mk_varname local (i + 1))
   | _ ->
@@ -978,16 +978,22 @@ let mk_decl crate (fun_decl : Charon.UllbcAst.blocks Charon.GAst.gfun_decl) :
     Textual.Module.decl option =
   try
     match fun_decl.body with
-    | Some body -> (
+    | Body body -> (
       try Some (Textual.Module.Proc (mk_procdesc crate fun_decl body))
       with L.InferUserError s ->
         L.user_warning "[WARNING] Trying procdecl for %s: @. [REASON]: %s @."
           (item_meta_to_string crate fun_decl.item_meta)
           s ;
         Some (Textual.Module.Procdecl (mk_procdecl crate fun_decl)) )
-    (* Functions withouth body, they can be among others functions from other crates,
-    opaque types or trait definitions without default implementations.*)
-    | None ->
+    (* Keep declarations for functions without a translatable body, including external functions,
+       opaque functions, and trait methods without default implementations. *)
+    | TraitMethodWithoutDefault
+    | Extern _
+    | Intrinsic _
+    | TargetDispatch _
+    | Opaque
+    | Missing
+    | Error _ ->
         Some (Textual.Module.Procdecl (mk_procdecl crate fun_decl))
   with L.InferUserError s ->
     (* Catch Translation error so that other functions can still be translated *)
@@ -1045,7 +1051,19 @@ let mk_tuple_type crate (local : Charon.Generated_GAst.local) =
 
 let mk_tuple_decl (crate : Charon.UllbcAst.crate)
     (fun_decl : Charon.UllbcAst.blocks Charon.GAst.gfun_decl) =
-  let locals = match fun_decl.body with Some {locals} -> locals.locals | None -> [] in
+  let locals =
+    match fun_decl.body with
+    | Body {locals} ->
+        locals.locals
+    | TraitMethodWithoutDefault
+    | Extern _
+    | Intrinsic _
+    | TargetDispatch _
+    | Opaque
+    | Missing
+    | Error _ ->
+        []
+  in
   List.concat_map locals ~f:(mk_tuple_type crate)
 
 

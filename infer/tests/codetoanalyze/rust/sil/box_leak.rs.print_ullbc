@@ -2,7 +2,7 @@
 
 // Full name: core::mem::forget
 #[lang_item("mem_forget")]
-pub fn forget<T>(_1: T)
+pub fn forget<T>(t_1: T)
 {
     let _0: (); // return
     let t_1: T; // arg #1

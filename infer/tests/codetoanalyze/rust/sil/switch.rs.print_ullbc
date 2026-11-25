@@ -9,7 +9,7 @@ enum Types {
 }
 
 // Full name: switch::get_value
-fn get_value(_1: Types) -> i32
+fn get_value(t_1: Types) -> i32
 {
     let _0: i32; // return
     let t_1: Types; // arg #1

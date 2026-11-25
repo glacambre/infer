@@ -1,5 +1,6 @@
 # Final ULLBC before serialization:
 
+// Full name: UNIT_METADATA
 fn UNIT_METADATA()
 {
     let _0: (); // return
@@ -10,13 +11,14 @@ fn UNIT_METADATA()
     }
 }
 
-const UNIT_METADATA: () = @Fun0()
+// Full name: UNIT_METADATA
+const UNIT_METADATA: () = UNIT_METADATA()
 
 // Full name: empty_struct::Adder
 struct Adder {}
 
 // Full name: empty_struct::{Adder}::add
-fn add<'_0>(_1: &'_0 Adder, _2: i32, _3: i32) -> i32
+fn add<'_0>(self_1: &'_0 Adder, a_2: i32, b_3: i32) -> i32
 {
     let _0: i32; // return
     let self_1: &'1 Adder; // arg #1

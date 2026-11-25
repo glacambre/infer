@@ -1,7 +1,7 @@
 # Final ULLBC before serialization:
 
 // Full name: ifelse_function::ifelse
-fn ifelse(_1: bool, _2: i32, _3: i32) -> i32
+fn ifelse(b_1: bool, x_2: i32, y_3: i32) -> i32
 {
     let _0: i32; // return
     let b_1: bool; // arg #1

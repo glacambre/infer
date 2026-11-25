@@ -1,5 +1,6 @@
 # Final ULLBC before serialization:
 
+// Full name: UNIT_METADATA
 fn UNIT_METADATA()
 {
     let _0: (); // return
@@ -10,10 +11,11 @@ fn UNIT_METADATA()
     }
 }
 
-const UNIT_METADATA: () = @Fun0()
+// Full name: UNIT_METADATA
+const UNIT_METADATA: () = UNIT_METADATA()
 
 // Full name: aliased_args_ub::use_both
-fn use_both<'_0, '_1>(_1: &'_0 mut i32, _2: &'_1 mut i32)
+fn use_both<'_0, '_1>(a_1: &'_0 mut i32, b_2: &'_1 mut i32)
 {
     let _0: (); // return
     let a_1: &'1 mut i32; // arg #1

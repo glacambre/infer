@@ -1,7 +1,7 @@
 # Final ULLBC before serialization:
 
 // Full name: nested::swi_nested
-pub fn swi_nested(_1: i32, _2: i32) -> i32
+pub fn swi_nested(a_1: i32, b_2: i32) -> i32
 {
     let _0: i32; // return
     let a_1: i32; // arg #1

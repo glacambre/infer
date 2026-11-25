@@ -32,6 +32,9 @@ Options:
       --rustc-arg <RUSTC_ARGS>
           Extra flags to pass to rustc
 
+      --targets <TARGETS>
+          A list of target architectures to translate for. Charon will run the compiler once for each target and aggregate the results, which is useful if the code includes `#[cfg(..)]` filters. Warning: this is an initial implementation which is extremely slow
+
       --monomorphize
           Monomorphize the items encountered when possible. Generic items found in the crate are skipped. To only translate a particular call graph, use `--start-from`. Note: this doesn't currently support `dyn Trait`
           
@@ -126,7 +129,7 @@ Options:
           Replace "bound checks followed by UB-on-overflow operation" with the corresponding panic-on-overflow operation. This loses unwinding information
 
       --reconstruct-asserts
-          Replace "if x { panic() }" with "assert(x)"
+          Replace `if x { panic() }` with `assert(x)`
 
       --unbind-item-vars
           Use `DeBruijnVar::Free` for the variables bound in item signatures, instead of `DeBruijnVar::Bound` everywhere. This simplifies the management of generics for projects that don't intend to manipulate them too much

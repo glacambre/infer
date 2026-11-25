@@ -1,5 +1,6 @@
 # Final ULLBC before serialization:
 
+// Full name: UNIT_METADATA
 fn UNIT_METADATA()
 {
     let _0: (); // return
@@ -10,10 +11,11 @@ fn UNIT_METADATA()
     }
 }
 
-const UNIT_METADATA: () = @Fun0()
+// Full name: UNIT_METADATA
+const UNIT_METADATA: () = UNIT_METADATA()
 
 // Full name: shared_read_ok::f
-fn f<'_0>(_1: &'_0 i32) -> i32
+fn f<'_0>(a_1: &'_0 i32) -> i32
 {
     let _0: i32; // return
     let a_1: &'1 i32; // arg #1

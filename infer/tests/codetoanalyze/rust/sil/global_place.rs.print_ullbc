@@ -15,7 +15,7 @@ fn X() -> i32
 const X: i32 = X()
 
 // Full name: global_place::succ
-fn succ(_1: i32) -> i32
+fn succ(i_1: i32) -> i32
 {
     let _0: i32; // return
     let i_1: i32; // arg #1

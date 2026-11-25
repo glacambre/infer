@@ -59,6 +59,13 @@ pub struct CliOpts {
     #[clap(long = "rustc-arg")]
     #[serde(default)]
     pub rustc_args: Vec<String>,
+    /// A list of target architectures to translate for. Charon will run the compiler once for each
+    /// target and aggregate the results, which is useful if the code includes `#[cfg(..)]`
+    /// filters.
+    /// Warning: this is an initial implementation which is extremely slow.
+    #[clap(long, value_delimiter = ',')]
+    #[serde(default)]
+    pub targets: Vec<String>,
 
     /// Monomorphize the items encountered when possible. Generic items found in the crate are
     /// skipped. To only translate a particular call graph, use `--start-from`. Note: this doesn't
@@ -213,7 +220,7 @@ pub struct CliOpts {
     #[clap(long)]
     #[serde(default)]
     pub reconstruct_fallible_operations: bool,
-    /// Replace "if x { panic() }" with "assert(x)".
+    /// Replace `if x { panic() }` with `assert(x)`.
     #[clap(long)]
     #[serde(default)]
     pub reconstruct_asserts: bool,
@@ -415,6 +422,18 @@ impl CliOpts {
         }
         Ok(())
     }
+
+    pub fn target_filename(&self, crate_name: &str) -> PathBuf {
+        match self.dest_file.clone() {
+            Some(f) => f,
+            None => {
+                let mut target_filename = self.dest_dir.clone().unwrap_or_default();
+                let extension = if self.ullbc { "ullbc" } else { "llbc" };
+                target_filename.push(format!("{crate_name}.{extension}"));
+                target_filename
+            }
+        }
+    }
 }
 
 /// Predicates that determine wihch items to use as starting point for translation.
@@ -485,7 +504,7 @@ pub struct TranslateOptions {
     /// Replace "bound checks followed by UB-on-overflow operation" with the corresponding
     /// panic-on-overflow operation. This loses unwinding information.
     pub reconstruct_fallible_operations: bool,
-    /// Replace "if x { panic() }" with "assert(x)".
+    /// Replace `if x { panic() }` with `assert(x)`.
     pub reconstruct_asserts: bool,
     // Use `DeBruijnVar::Free` for the variables bound in item signatures.
     pub unbind_item_vars: bool,
@@ -504,15 +523,10 @@ pub struct TranslateOptions {
 
 impl TranslateOptions {
     pub fn new(error_ctx: &mut ErrorCtx, options: &CliOpts) -> Self {
-        let mut parse_pattern = |s: &str| match NamePattern::parse(s) {
-            Ok(p) => Ok(p),
-            Err(e) => {
-                raise_error!(
-                    error_ctx,
-                    crate(&TranslatedCrate::default()),
-                    Span::dummy(),
-                    "failed to parse pattern `{s}` ({e})"
-                )
+        let mut parse_pattern = |s: &str| -> Result<_, Error> {
+            match NamePattern::parse(s) {
+                Ok(p) => Ok(p),
+                Err(e) => raise_error!(error_ctx, no_crate, "failed to parse pattern `{s}` ({e})"),
             }
         };
 
@@ -524,7 +538,7 @@ impl TranslateOptions {
         let mut start_from = options
             .start_from
             .iter()
-            .filter_map(|path| parse_pattern(&path).ok())
+            .filter_map(|path| parse_pattern(path).ok())
             .map(|p| StartFrom::Pattern {
                 pattern: p,
                 strict: true,
@@ -534,7 +548,7 @@ impl TranslateOptions {
             options
                 .start_from_if_exists
                 .iter()
-                .filter_map(|path| parse_pattern(&path).ok())
+                .filter_map(|path| parse_pattern(path).ok())
                 .map(|p| StartFrom::Pattern {
                     pattern: p,
                     strict: false,
@@ -578,9 +592,9 @@ impl TranslateOptions {
             }
 
             if options.hide_allocator {
-                opacities.push((format!("core::alloc::Allocator"), Invisible));
+                opacities.push(("core::alloc::Allocator".to_string(), Invisible));
                 opacities.push((
-                    format!("alloc::alloc::{{impl core::alloc::Allocator for _}}"),
+                    "alloc::alloc::{impl core::alloc::Allocator for _}".to_string(),
                     Invisible,
                 ));
             }
@@ -594,7 +608,7 @@ impl TranslateOptions {
         let lift_associated_types = options
             .lift_associated_types
             .iter()
-            .filter_map(|s| parse_pattern(&s).ok())
+            .filter_map(|s| parse_pattern(s).ok())
             .collect();
 
         TranslateOptions {

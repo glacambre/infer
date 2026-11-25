@@ -1,5 +1,6 @@
 # Final ULLBC before serialization:
 
+// Full name: UNIT_METADATA
 fn UNIT_METADATA()
 {
     let _0: (); // return
@@ -10,10 +11,11 @@ fn UNIT_METADATA()
     }
 }
 
-const UNIT_METADATA: () = @Fun0()
+// Full name: UNIT_METADATA
+const UNIT_METADATA: () = UNIT_METADATA()
 
 // Full name: call_invalidates_sibling_ub::write
-fn write<'_0>(_1: &'_0 mut i32)
+fn write<'_0>(a_1: &'_0 mut i32)
 {
     let _0: (); // return
     let a_1: &'1 mut i32; // arg #1

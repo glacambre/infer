@@ -1,7 +1,7 @@
 # Final ULLBC before serialization:
 
 // Full name: loop_with_continue::goto_with_continue
-pub fn goto_with_continue(_1: i32, _2: i32) -> i32
+pub fn goto_with_continue(x_1: i32, y_2: i32) -> i32
 {
     let _0: i32; // return
     let x_1: i32; // arg #1

@@ -91,3 +91,41 @@ fn main() {
 
     global GLOBAL@dummy::Y: int = [Some dummy::Y()]
     |}]
+
+
+let%expect_test "external function declaration" =
+  test
+    {|
+unsafe extern "C" {
+    fn external(x: i32) -> i32;
+}
+
+fn main() {
+    let _ = unsafe { external(42) };
+}
+|} ;
+  [%expect
+    {|
+    .source_language = "Rust"
+
+    define dummy::main() : void {
+      local var_0: void, var_1: int
+      #node_0:
+          store &var_0 <- null:void
+          n0 = dummy::external(42)
+          store &var_1 <- n0:int
+          jmp node_2
+          .handlers node_1
+
+      #node_1:
+          throw "Undefined Behaviour"
+
+      #node_2:
+          store &var_0 <- null:void
+          n1:void = load &var_0
+          ret n1
+
+    }
+
+    declare dummy::external(int) : int
+    |}]
